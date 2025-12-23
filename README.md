@@ -3,16 +3,16 @@
 ### 基本使用
 ```bash
 # 分析主动式 ETF（默认）
-python ETFEngine_main.py active_etf
+python3 ETFEngine_main.py active_etf
 
 # 分析高股息 ETF
-python ETFEngine_main.py high_dividend_etf
+python3 ETFEngine_main.py high_dividend_etf
 
 # 分析股息 ETF
-python ETFEngine_main.py dividend_etf
+python3 ETFEngine_main.py dividend_etf
 
 # 分析美股 ETF
-python ETFEngine_main.py us_etf
+python3 ETFEngine_main.py us_etf
 ```
 
 ## 📁 项目结构

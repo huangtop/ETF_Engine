@@ -134,11 +134,19 @@ class ETFConfigLoader:
         elif len(config['etf_list']) == 0:
             errors.append("'etf_list' 不能为空")
         else:
-            # 验证 ETF 列表格式
+            # 验证 ETF 列表格式，支持数组或对象格式
             for i, etf in enumerate(config['etf_list']):
-                # 支持 [ticker, name] 或 [ticker, name, type] 格式
-                if not isinstance(etf, (list, tuple)) or len(etf) < 2 or len(etf) > 3:
-                    errors.append(f"ETF 列表项 {i} 格式错误，应为 [ticker, name] 或 [ticker, name, type]")
+                # 支持 [ticker, name]、[ticker, name, type] 或 {ticker, name, ...} 对象格式
+                if isinstance(etf, dict):
+                    # 对象格式：检查必需的 ticker 和 name 字段
+                    if 'ticker' not in etf or 'name' not in etf:
+                        errors.append(f"ETF 列表项 {i} 缺少必需字段（ticker, name）")
+                elif isinstance(etf, (list, tuple)):
+                    # 数组格式：检查长度
+                    if len(etf) < 2 or len(etf) > 3:
+                        errors.append(f"ETF 列表项 {i} 格式错误，应为 [ticker, name]、[ticker, name, type] 或对象格式")
+                else:
+                    errors.append(f"ETF 列表项 {i} 格式错误，应为数组或对象")
         
         if 'expense_ratio' not in config:
             errors.append("缺少 'expense_ratio' 字段")
@@ -152,7 +160,14 @@ class ETFConfigLoader:
         
         # 检查 ETF 列表和费用率的一致性（允许null值表示数据不可用）
         if 'etf_list' in config and 'expense_ratio' in config:
-            tickers_in_list = [etf[0] for etf in config['etf_list']]
+            # 支持对象和数组两种格式
+            tickers_in_list = []
+            for etf in config['etf_list']:
+                if isinstance(etf, dict):
+                    tickers_in_list.append(etf.get('ticker', ''))
+                else:
+                    tickers_in_list.append(etf[0] if len(etf) > 0 else '')
+            
             tickers_in_ratio = set(config['expense_ratio'].keys())
             
             missing_ratios = set(tickers_in_list) - tickers_in_ratio

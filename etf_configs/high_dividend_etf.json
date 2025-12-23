@@ -7,127 +7,36 @@
     "last_updated": "2025-12-23"
   },
   "etf_list": [
-    [
-      "00929.TW",
-      "復華台灣科技優息"
-    ],
-    [
-      "00934.TW",
-      "中信成長高股息"
-    ],
-    [
-      "00936.TW",
-      "台新永續高息中小"
-    ],
-    [
-      "00939.TW",
-      "統一台灣高息動能"
-    ],
-    [
-      "00940.TW",
-      "元大台灣價值高息"
-    ],
-    [
-      "00944.TW",
-      "野村趨勢動能高息"
-    ],
-    [
-      "00946.TW",
-      "群益科技高息成長"
-    ],
-    [
-      "00961.TW",
-      "FT臺灣永續高息"
-    ],
-    [
-      "00943.TW",
-      "兆豐電子高股息等權"
-    ],
-    [
-      "0056.TW",
-      "元大高股息"
-    ],
-    [
-      "00878.TW",
-      "國泰永續高股息"
-    ],
-    [
-      "00713.TW",
-      "元大台灣高息低波"
-    ],
-    [
-      "00915.TW",
-      "凱基優選高股息30"
-    ],
-    [
-      "00918.TW",
-      "大華優利高填息30"
-    ],
-    [
-      "00919.TW",
-      "群益台灣精選高息"
-    ],
-    [
-      "00932.TW",
-      "兆豐永續高息等權"
-    ],
-    [
-      "00731.TW",
-      "復華富時高息低波"
-    ],
-    [
-      "00900.TW",
-      "富邦特選高股息30"
-    ],
-    [
-      "00927.TW",
-      "群益半導體收益"
-    ],
-    [
-      "00907.TW",
-      "永豐優息存股"
-    ],
-    [
-      "00930.TW",
-      "永豐 ESG 低碳高息"
-    ],
-    [
-      "00701.TW",
-      "國泰股利精選30"
-    ],
-    [
-      "00730.TW",
-      "富邦臺灣優質高息"
-    ],
-    [
-      "00702.TW",
-      "國泰標普低波高息"
-    ]
+    {"ticker": "00929.TW", "name": "復華台灣科技優息", "type": "high_dividend", "short_name": "科技優息"},
+    {"ticker": "00934.TW", "name": "中信成長高股息", "type": "high_dividend", "short_name": "成長高息"},
+    {"ticker": "00936.TW", "name": "台新永續高息中小", "type": "high_dividend", "short_name": "永續高息"},
+    {"ticker": "00939.TW", "name": "統一台灣高息動能", "type": "high_dividend", "short_name": "高息動能"},
+    {"ticker": "00940.TW", "name": "元大台灣價值高息", "type": "high_dividend", "short_name": "價值高息"},
+    {"ticker": "00944.TW", "name": "野村趨勢動能高息", "type": "high_dividend", "short_name": "動能高息"},
+    {"ticker": "00946.TW", "name": "群益科技高息成長", "type": "high_dividend", "short_name": "科技高息"},
+    {"ticker": "00961.TW", "name": "FT臺灣永續高息", "type": "high_dividend", "short_name": "永續高息"},
+    {"ticker": "00943.TW", "name": "兆豐電子高股息等權", "type": "high_dividend", "short_name": "電子高息"},
+    {"ticker": "0056.TW", "name": "元大高股息", "type": "high_dividend", "short_name": "高股息"},
+    {"ticker": "00878.TW", "name": "國泰永續高股息", "type": "high_dividend", "short_name": "永續高息"},
+    {"ticker": "00713.TW", "name": "元大台灣高息低波", "type": "high_dividend", "short_name": "高息低波"},
+    {"ticker": "00915.TW", "name": "凱基優選高股息30", "type": "high_dividend", "short_name": "優選高息"},
+    {"ticker": "00918.TW", "name": "大華優利高填息30", "type": "high_dividend", "short_name": "優利高息"},
+    {"ticker": "00919.TW", "name": "群益台灣精選高息", "type": "high_dividend", "short_name": "精選高息"},
+    {"ticker": "00932.TW", "name": "兆豐永續高息等權", "type": "high_dividend", "short_name": "永續高息"},
+    {"ticker": "00731.TW", "name": "復華富時高息低波", "type": "high_dividend", "short_name": "高息低波"},
+    {"ticker": "00900.TW", "name": "富邦特選高股息30", "type": "high_dividend", "short_name": "特選高息"},
+    {"ticker": "00927.TW", "name": "群益半導體收益", "type": "high_dividend", "short_name": "半導體收益"},
+    {"ticker": "00907.TW", "name": "永豐優息存股", "type": "high_dividend", "short_name": "優息存股"},
+    {"ticker": "00930.TW", "name": "永豐 ESG 低碳高息", "type": "high_dividend", "short_name": "ESG高息"},
+    {"ticker": "00701.TW", "name": "國泰股利精選30", "type": "high_dividend", "short_name": "股利精選"},
+    {"ticker": "00730.TW", "name": "富邦臺灣優質高息", "type": "high_dividend", "short_name": "優質高息"},
+    {"ticker": "00702.TW", "name": "國泰標普低波高息", "type": "high_dividend", "short_name": "低波高息"}
   ],
   "expense_ratio": {
-    "00929.TW": 0.6,
-    "00934.TW": 0.7,
-    "00936.TW": 0.75,
-    "00939.TW": 0.68,
-    "00940.TW": 0.65,
-    "00944.TW": 0.72,
-    "00946.TW": 0.7,
-    "00961.TW": 0.78,
-    "00943.TW": 0.75,
-    "0056.TW": 0.6,
-    "00878.TW": 0.42,
-    "00713.TW": 0.59,
-    "00915.TW": 0.74,
-    "00918.TW": 0.76,
-    "00919.TW": 0.59,
-    "00932.TW": 0.68,
-    "00731.TW": 0.64,
-    "00900.TW": 0.58,
-    "00927.TW": 0.8,
-    "00907.TW": 0.66,
-    "00930.TW": 0.69,
-    "00701.TW": 0.49,
-    "00730.TW": 0.61,
-    "00702.TW": 0.54
+    "00929.TW": 0.6, "00934.TW": 0.7, "00936.TW": 0.75, "00939.TW": 0.68, "00940.TW": 0.65,
+    "00944.TW": 0.72, "00946.TW": 0.7, "00961.TW": 0.78, "00943.TW": 0.75, "0056.TW": 0.6,
+    "00878.TW": 0.42, "00713.TW": 0.59, "00915.TW": 0.74, "00918.TW": 0.76, "00919.TW": 0.59,
+    "00932.TW": 0.68, "00731.TW": 0.64, "00900.TW": 0.58, "00927.TW": 0.8, "00907.TW": 0.66,
+    "00930.TW": 0.69, "00701.TW": 0.49, "00730.TW": 0.61, "00702.TW": 0.54
   }
 }

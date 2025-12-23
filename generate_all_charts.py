@@ -26,29 +26,6 @@ def run_etf_analysis(config_type):
         
         if result.returncode == 0:
             print(f"✅ {config_type} 圖表生成成功")
-            
-            # 自動添加時間戳到生成的 PNG 文件
-            print(f"  📌 添加時間戳到 PNG 文件...")
-            folder_mapping = {
-                'active_etf': 'Output_Active_ETF',
-                'high_dividend_etf': 'Output_HighDividend_ETF',
-                'industry_etf': 'Output_Industry_ETF',
-                'us_etf': 'Output_US_ETF',
-                'dividend_etf': 'Output_Dividend_ETF'
-            }
-            
-            output_folder = folder_mapping.get(config_type, 'Output_Default')
-            if os.path.exists(output_folder):
-                try:
-                    subprocess.run(
-                        [sys.executable, 'add_timestamps.py', output_folder],
-                        capture_output=True,
-                        timeout=60
-                    )
-                    print(f"  ✅ 時間戳添加完成")
-                except Exception as e:
-                    print(f"  ⚠️  時間戳添加失敗: {e}")
-            
             return True
         else:
             print(f"⚠️  {config_type} 圖表生成失敗（代碼 {result.returncode}）")

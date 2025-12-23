@@ -121,7 +121,7 @@ def find_common_start_date(etf_list, initial_start_date, end_date, use_fixed_sta
     """找出所有ETF的最晚開始日期作為統一比較期間
     
     Args:
-        etf_list: ETF 列表
+        etf_list: ETF 列表（支持對象和數組格式）
         initial_start_date: 初始起始日期
         end_date: 結束日期
         use_fixed_start: 是否使用固定的起始日期（跳過太新的ETF）
@@ -130,9 +130,17 @@ def find_common_start_date(etf_list, initial_start_date, end_date, use_fixed_sta
     
     print("\n📅 檢查各ETF資料起始日期...")
     for item in etf_list:
-        ticker = item[0]
-        name = item[1]
-        # 忽略可選的第3個元素（分類信息）
+        # 支持對象和數組兩種格式
+        if isinstance(item, dict):
+            ticker = item.get('ticker', '').strip()
+            name = item.get('name', '').strip()
+        else:
+            ticker = item[0].strip()
+            name = item[1].strip()
+        
+        if not ticker:
+            continue
+            
         try:
             df = yf.download(ticker, start=initial_start_date, end=end_date, progress=False)
             if isinstance(df, pd.DataFrame) and not df.empty:
@@ -505,9 +513,21 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         if benchmark_returns is not None and len(benchmark_returns) > 0:
             alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
         
+        # 從 etf_list 中查找 ETF 名稱（支持對象和數組格式）
+        etf_name = '未知'
+        for item in etf_list:
+            if isinstance(item, dict):
+                if item.get('ticker', '').strip() == ticker:
+                    etf_name = item.get('name', '未知').strip()
+                    break
+            else:
+                if len(item) > 0 and item[0].strip() == ticker:
+                    etf_name = item[1].strip() if len(item) > 1 else '未知'
+                    break
+        
         return {
             '證券代碼': clean_ticker,
-            '名稱': next((item[1] for item in etf_list if item[0] == ticker), '未知').strip(),  # 從 etf_list 中查找名稱
+            '名稱': etf_name,
             '資料期間 (年)': round(data_years, 2),
             '年化報酬率 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
@@ -722,8 +742,8 @@ def plot_radar_chart(df_results):
         
         # 圖例
         legend = plt.legend(bbox_to_anchor=(1.15, 1.0), loc='upper left', 
-                           fontsize=10, frameon=True, fancybox=True, shadow=True,
-                           title='ETF 清單', title_fontsize=12)
+                           fontsize=14, frameon=True, fancybox=True, shadow=True,
+                           title='ETF 清單', title_fontsize=16)
         
         plt.tight_layout()
         
@@ -895,7 +915,7 @@ def plot_radar_chart(df_results):
     legend3 = plt.legend(handles=marker_legend_elements, 
                         bbox_to_anchor=(1.15, 0.2), loc='upper left',
                         fontsize=11, frameon=True, fancybox=True, shadow=True,
-                        title='標記說明', title_fontsize=12)
+                        title='標記說明', title_fontsize=16)
     plt.gca().add_artist(legend1)
     if 'legend2' in locals():
         plt.gca().add_artist(legend2)
@@ -969,26 +989,45 @@ def plot_radar_chart(df_results):
     print(f"  ■ 台股高股息ETF: {len(tw_dividend_etfs)} 支")
     print(f"  總計: {len(us_etfs) + len(tw_stock_etfs) + len(tw_dividend_etfs)} 支")
 
-def plot_price_trend(etf_dict):
+def plot_price_trend(etf_list, config, common_start_date, latest_date):
     """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
     
-    # 分類ETF
+    # 從 etf_list 提取信息（支持對象和數組格式）
+    etf_info = {}
+    etf_types = {}
+    
+    for item in etf_list:
+        if isinstance(item, dict):
+            # 對象格式：{"ticker": "...", "name": "...", "type": "..."}
+            ticker = item.get('ticker', '').strip()
+            name = item.get('name', '').strip()
+            etf_type = item.get('type', 'tw_active').strip()
+        else:
+            # 數組格式：[ticker, name] 或 [ticker, name, type]
+            ticker = item[0].strip()
+            name = item[1].strip()
+            etf_type = item[2].strip() if len(item) > 2 else 'tw_active'
+        
+        if ticker:
+            etf_info[ticker] = name
+            etf_types[ticker] = etf_type
+    
+    # 根據 JSON 中的分類信息分組 ETF
     us_etfs = {}
     tw_dividend_etfs = {}
     tw_stock_etfs = {}
     
-    for ticker, name in etf_dict.items():
-        ticker_clean = ticker.strip()
-        name_clean = name.strip()
+    for ticker, name in etf_info.items():
+        etf_type = etf_types.get(ticker, 'tw_active')
         
-        if ticker_clean in ['00646.TW', '00662.TW', '00757.TW', '00983A.TW']:
-            us_etfs[ticker_clean] = name_clean
-        elif any(keyword in name_clean for keyword in ['高股息', '高息', '永續']):
-            tw_dividend_etfs[ticker_clean] = name_clean
+        if etf_type == 'us':
+            us_etfs[ticker] = name
+        elif etf_type == 'dividend':
+            tw_dividend_etfs[ticker] = name
         else:
-            tw_stock_etfs[ticker_clean] = name_clean
+            tw_stock_etfs[ticker] = name
     
     # 1. 總覽圖（使用3年期間）
     def plot_overview():
@@ -1029,7 +1068,7 @@ def plot_price_trend(etf_dict):
             print(f"S&P 500指數下載失敗: {e}")
         
         # 繪製各ETF（較細的線條）
-        for i, (ticker, name) in enumerate(etf_dict.items()):
+        for i, (ticker, name) in enumerate(etf_info.items()):
             try:
                 df = yf.download(ticker.strip(), start=start_date_3y, end=latest_date, progress=False)
                 if not df.empty:
@@ -1121,7 +1160,8 @@ def plot_price_trend(etf_dict):
             print(f"❌ {category_name}無法確定比較起始日期")
             return
         
-        comparison_start = latest_etf_start.strftime('%Y-%m-%d')
+        # comparison_start = latest_etf_start.strftime('%Y-%m-%d')
+        comparison_start = common_start_date
         print(f"📅 {category_name}統一比較期間: {comparison_start} 至 {latest_date}")
         
         plt.figure(figsize=(14, 8))
@@ -1211,7 +1251,7 @@ def plot_price_trend(etf_dict):
         
         plt.grid(True, alpha=0.3)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
-                   fontsize=10, frameon=True, fancybox=True, shadow=True,
+                   fontsize=14, frameon=True, fancybox=True, shadow=True,
                    title=f'{category_name}\n實線：主動型\n虛線：被動型', title_fontsize=9)
         plt.tight_layout()
         
@@ -1360,8 +1400,10 @@ def plot_multi_metrics_comparison(df_results):
             max_val = values[max_idx]
             print(f"  🏆 {metric_name}: {champion_ticker} ({champion_name}) - {max_val:{fmt}}")
     
-    # 總標題
-    fig.suptitle('ETF 多指標性能比較表', fontsize=FONT_SIZE_CONFIG['title_large'], 
+    # 總標題（添加時間戳）
+    from datetime import datetime
+    current_time = datetime.now().strftime('%Y%m%d %H:%M')
+    fig.suptitle(f'ETF 多指標性能比較表 {current_time}生成', fontsize=FONT_SIZE_CONFIG['title_large'], 
                 fontweight='bold', y=0.995)
     
     # 添加說明
@@ -1687,7 +1729,14 @@ if __name__ == '__main__':
     print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
     results = []
     for item in etf_list:
-        ticker = item[0]
+        # 支持對象和數組格式
+        if isinstance(item, dict):
+            ticker = item.get('ticker', '').strip()
+        else:
+            ticker = item[0].strip()
+        
+        if not ticker:
+            continue
         # 忽略可選的第3個元素（分類信息）
         data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate)
         if data:
@@ -1771,7 +1820,7 @@ if __name__ == '__main__':
         print("\n📊 正在生成視覺化圖表...")
         
         # 修正字體問題的視覺化
-        plot_price_trend({item[0].strip(): item[1].strip() for item in etf_list})
+        plot_price_trend(etf_list, config, common_start_date, latest_date)
         plot_radar_chart(df_results)
         plot_multi_metrics_comparison(df_results)  # 新增：多指標比較圖
         plot_performance_comparison(df_results)
