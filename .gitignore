@@ -31,23 +31,17 @@ test_*.py
 
 # 日志文件
 *.log
-etf_run.log
-dividend_run.log
-final_test.log
-final_test2.log
-industry_test.log
-*.log
-*.log.*
-*_run.log
-main_run.log
-hd_run.log
-final_run.log
-active_run.log
-active_run2.log
+
+# Markdown 文件（除了 README）
+*.md
+!README.md
+FETCH_EXPENSE_RATIO.md
+*.md.*
 
 # 临时文件
 pid.txt
 *.tmp
+UPDATE_TIME.txt
 *.bak
 *.backup
 

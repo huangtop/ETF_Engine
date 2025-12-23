@@ -561,6 +561,23 @@ def setup_matplotlib_backend():
     
     return plt
 
+
+def add_timestamp_to_figure(fig, timestamp=None):
+    """在圖表底部添加生成時間戳"""
+    if timestamp is None:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 在圖表底部添加時間戳文本
+    fig.text(0.99, 0.01, f'Generated: {timestamp}', 
+             ha='right', va='bottom', fontsize=8, style='italic', alpha=0.6)
+
+
+def save_figure_with_timestamp(fig, output_path, dpi=300, bbox_inches='tight'):
+    """保存圖表並自動添加時間戳"""
+    add_timestamp_to_figure(fig)
+    fig.savefig(output_path, dpi=dpi, bbox_inches=bbox_inches)
+
+
 def setup_chinese_font():
     """設定中文字體（已通過 font_config 改進版本）"""
     # 字體配置已在導入時完成
@@ -1530,17 +1547,11 @@ def plot_performance_comparison(df_results):
         ax.grid(True, alpha=0.3, axis='y')
         ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
         
-        # 圖例
-        from matplotlib.patches import Patch
-        legend_elements = [
-            Patch(facecolor='#FF6384', label='主動型 ETF'),
-            Patch(facecolor='#FF9F40', label='高股息 ETF'),
-            Patch(facecolor='#36A2EB', label='一般被動型 ETF'),
-            Patch(facecolor='#D3D3D3', label='基準指數（灰色）'),
-        ]
-        ax.legend(handles=legend_elements, loc='upper center', 
-                 bbox_to_anchor=(0.5, -0.15), ncol=4, 
-                 fontsize=FONT_SIZE_CONFIG['legend'], frameon=True, fancybox=True, shadow=True)
+        # 在保存前添加時間戳到標題
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y%m%d %H:%M')
+        timestamp_title = f'台股 ETF 年化報酬率比較 (含基準) {current_time}生成'
+        ax.set_title(timestamp_title, fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         
         plt.tight_layout()
         
@@ -1548,7 +1559,7 @@ def plot_performance_comparison(df_results):
         try:
             output_path = os.path.join(output_folder, 'etf_performance_comparison_TW.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            print(f"  ✅ 台股 ETF 柱狀圖已儲存: etf_performance_comparison_TW.png")
+            print(f"  ✅ 台股 ETF 柱狀圖已儲存: etf_performance_comparison_TW.png ({current_time})")
         except Exception as e:
             print(f"  ❌ 保存失敗: {e}")
         
@@ -1634,18 +1645,11 @@ def plot_performance_comparison(df_results):
         ax.grid(True, alpha=0.3, axis='y')
         ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
         
-        # 圖例
-        from matplotlib.patches import Patch
-        legend_elements = [
-            Patch(facecolor='#FF9F40', label='ARK創新'),
-            Patch(facecolor='#4BC0C0', label='S&P500相關'),
-            Patch(facecolor='#9966FF', label='NASDAQ相關'),
-            Patch(facecolor='#FF5733', label='FANG+相關'),
-            Patch(facecolor='#D3D3D3', label='基準指數（灰色）'),
-        ]
-        ax.legend(handles=legend_elements, loc='upper center', 
-                 bbox_to_anchor=(0.5, -0.15), ncol=5, 
-                 fontsize=FONT_SIZE_CONFIG['legend'], frameon=True, fancybox=True, shadow=True)
+        # 在保存前添加時間戳到標題
+        from datetime import datetime
+        current_time = datetime.now().strftime('%Y%m%d %H:%M')
+        timestamp_title = f'美股 ETF 年化報酬率比較 (含基準) {current_time}生成'
+        ax.set_title(timestamp_title, fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         
         plt.tight_layout()
         
@@ -1653,7 +1657,7 @@ def plot_performance_comparison(df_results):
         try:
             output_path = os.path.join(output_folder, 'etf_performance_comparison_US.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            print(f"  ✅ 美股 ETF 柱狀圖已儲存: etf_performance_comparison_US.png")
+            print(f"  ✅ 美股 ETF 柱狀圖已儲存: etf_performance_comparison_US.png ({current_time})")
         except Exception as e:
             print(f"  ❌ 保存失敗: {e}")
         
