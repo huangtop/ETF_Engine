@@ -1,0 +1,21 @@
+{
+  "category": "美股ETF",
+  "description": "美股相關被動式ETF，包括S&P500、NASDAQ等",
+  "metadata": {
+    "created": "2025-12-22",
+    "version": "1.0",
+    "last_updated": "2025-12-22"
+  },
+  "etf_list": [
+    ["00646.TW", "元大S&P500"],
+    ["00662.TW", "富邦NASDAQ"],
+    ["00757.TW", "統一FANG+"],
+    ["00711.TW", "國泰美國高息"]
+  ],
+  "expense_ratio": {
+    "00646.TW": 0.66,
+    "00662.TW": 0.51,
+    "00757.TW": 1.15,
+    "00711.TW": 0.75
+  }
+}

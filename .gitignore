@@ -1,0 +1,71 @@
+# 环境和依赖
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 输出文件夹
+Output_*/
+Output_Active_ETF/
+Output_HighDividend_ETF/
+Output_Dividend_ETF/
+Output_US_ETF/
+Output_Industry_ETF/
+Output_Default/
+charts_output/
+
+# 测试文件（开头为test_的.py文件）
+test_*.py
+
+# 日志文件
+*.log
+etf_run.log
+dividend_run.log
+final_test.log
+final_test2.log
+industry_test.log
+*.log
+*.log.*
+*_run.log
+main_run.log
+hd_run.log
+final_run.log
+active_run.log
+active_run2.log
+
+# 临时文件
+pid.txt
+*.tmp
+*.bak
+*.backup
+
+# 文档（不跟踪个别.md，除了主README）
+FONT_IMPROVEMENT.md
+FONT_QUICK_REF.md
+CONFIG_USAGE.md
+TEST_SUMMARY.sh
+
+# 旧版本
+*_old.py
+*_clean.py
+*.old
+
+# CSV缓存（可选，如果不想跟踪临时数据）
+# *.csv
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride

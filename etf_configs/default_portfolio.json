@@ -1,0 +1,16 @@
+{
+  "category": "組合配置",
+  "description": "預設組合配置 - 同時包含主動式和被動式ETF",
+  "metadata": {
+    "created": "2025-12-22",
+    "version": "1.0",
+    "note": "這個配置合並了多種ETF類別供分析比較"
+  },
+  "include": [
+    "active_etf",
+    "high_dividend_etf",
+    "market_cap_etf",
+    "us_etf"
+  ],
+  "comment": "要使用此配置，請在程式中使用 load_multiple_etf_configs(['active_etf', 'high_dividend_etf', 'market_cap_etf', 'us_etf'])"
+}

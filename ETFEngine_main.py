@@ -1,0 +1,1804 @@
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+from matplotlib.font_manager import FontProperties
+import platform
+from get_twse_dividend import get_twse_dividend
+import os
+import sys
+import warnings
+
+# 抑制警告
+warnings.filterwarnings('ignore')
+
+# 設定環境變數，避免 tkinter 衝突
+os.environ['MPLBACKEND'] = 'Agg'
+
+# 確保 matplotlib 使用正確後端
+import matplotlib
+matplotlib.use('Agg', force=True)
+
+import matplotlib.pyplot as plt
+plt.ioff()  # 關閉互動模式
+
+# 導入改進的字體配置
+from font_config import setup_chinese_font_enhanced, update_font_sizes, FONT_SIZE_CONFIG
+
+# 設置中文字體和字體大小
+setup_chinese_font_enhanced()
+update_font_sizes()
+
+# 從 JSON 配置加載 ETF 列表
+from config_loader import load_etf_config
+
+# 從命令行獲取配置類型，默認為 'active_etf'
+if len(sys.argv) > 1:
+    config_type = sys.argv[1]
+else:
+    config_type = 'active_etf'
+
+print(f"📋 使用配置: {config_type}")
+
+# 加载配置
+config = load_etf_config(config_type)
+etf_list = config['etf_list']
+expense_ratio_dict = config['expense_ratio']
+
+# 風險無風報酬率
+risk_free_rate = 0.015
+
+# 日期範圍
+today = datetime.now()
+start_date_3y = (today - timedelta(days=3*365)).strftime('%Y-%m-%d')
+latest_date = today.strftime('%Y-%m-%d')
+
+
+def get_output_folder(config_type='active_etf'):
+    """根據配置類型創建對應的輸出資料夾"""
+    folder_mapping = {
+        'active_etf': 'Output_Active_ETF',
+        'dividend_etf': 'Output_Dividend_ETF',
+        'high_dividend_etf': 'Output_HighDividend_ETF',
+        'us_etf': 'Output_US_ETF',
+        'industry_etf': 'Output_Industry_ETF'
+    }
+    
+    folder_name = folder_mapping.get(config_type, 'Output_Default')
+    output_path = os.path.join(os.getcwd(), folder_name)
+    
+    # 如果資料夾不存在則創建
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+        print(f"✅ 創建輸出資料夾: {output_path}")
+    
+    return output_path
+
+
+# 初始化輸出資料夾
+output_folder = get_output_folder(config_type)
+
+
+def find_common_start_date(etf_list, initial_start_date, end_date):
+    """找出所有ETF的最晚開始日期作為統一比較期間"""
+    latest_start_date = None
+    
+    print("\n📅 檢查各ETF資料起始日期...")
+    for ticker, name in etf_list:
+        try:
+            df = yf.download(ticker, start=initial_start_date, end=end_date, progress=False)
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                df.dropna(inplace=True)
+                if len(df) > 0:
+                    etf_start = df.index[0]
+                    print(f"   {ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
+                    
+                    if latest_start_date is None or etf_start > latest_start_date:
+                        latest_start_date = etf_start
+        except Exception as e:
+            print(f"   {ticker} 檢查失敗: {e}")
+    
+    if latest_start_date:
+        common_start = latest_start_date.strftime('%Y-%m-%d')
+        print(f"\n✅ 統一比較期間: {common_start} 至 {end_date}")
+        print(f"   (從最晚上市的ETF開始計算，確保公平比較)\n")
+        return common_start
+    else:
+        print(f"   使用預設起始日期: {initial_start_date}\n")
+        return initial_start_date
+
+
+def smart_label_with_ticker(name, ticker):
+    """智能標籤處理，保留股票代號和關鍵資訊"""
+    name = name.strip()
+    ticker_short = ticker.replace('.TW', '').strip()
+    
+    # 簡化名稱但保留關鍵資訊
+    if '主動' in name:
+        # 主動型：保留"主動"標識，移除"台灣"節省空間
+        short_name = name.replace('台灣', '').strip()
+        return f"{ticker_short}\n{short_name}"
+    elif 'ARK' in name:
+        return f"{ticker_short}\nARK創新"
+    elif 'S&P500' in name:
+        return f"{ticker_short}\nS&P500"
+    elif 'NASDAQ' in name:
+        return f"{ticker_short}\nNASDAQ"
+    elif 'FANG' in name:
+        return f"{ticker_short}\nFANG+"
+    elif '台灣50' in name or '台50' in name:
+        return f"{ticker_short}\n台灣50"
+    elif '高股息' in name:
+        base_name = name.replace('高股息', '').strip()
+        return f"{ticker_short}\n{base_name}高息"
+    elif '永續' in name:
+        return f"{ticker_short}\n永續高息"
+    else:
+        # 其他情況：如果名稱太長，適度縮短
+        if len(name) > 8:
+            short_name = name[:6] + '..'
+            return f"{ticker_short}\n{short_name}"
+        return f"{ticker_short}\n{name}"
+
+def find_common_start_date(etf_list, initial_start_date, end_date):
+    """找出所有ETF的最晚開始日期作為統一比較期間"""
+    latest_start_date = None
+    
+    print("檢查各ETF資料起始日期...")
+    for ticker, name in etf_list:
+        try:
+            df = yf.download(ticker, start=initial_start_date, end=end_date)
+            if not df.empty:
+                df.dropna(inplace=True)
+                if len(df) > 0:
+                    etf_start = df.index[0]
+                    print(f"{ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
+                    
+                    if latest_start_date is None or etf_start > latest_start_date:
+                        latest_start_date = etf_start
+        except Exception as e:
+            print(f"{ticker} 檢查失敗: {e}")
+    
+    if latest_start_date:
+        common_start = latest_start_date.strftime('%Y-%m-%d')
+        print(f"\n統一比較期間: {common_start} 至 {end_date}")
+        return common_start
+    else:
+        return initial_start_date
+
+def calculate_returns(prices):
+    """計算報酬率"""
+    try:
+        if len(prices) < 2:
+            return np.nan, np.nan
+        
+        if isinstance(prices, pd.DataFrame):
+            prices = prices.iloc[:, 0]
+            
+        start_price = prices.iloc[0]
+        end_price = prices.iloc[-1]
+        
+        if isinstance(start_price, pd.Series):
+            start_price = start_price.iloc[0]
+        if isinstance(end_price, pd.Series):
+            end_price = end_price.iloc[0]
+            
+        years = len(prices) / 252
+        
+        if years >= 1.0:
+            # 年化報酬率
+            cagr = (end_price / start_price) ** (1 / years) - 1
+            return cagr, years
+        else:
+            # 總報酬率
+            total_return = (end_price / start_price) - 1
+            return total_return, years
+            
+    except Exception as e:
+        print(f"報酬率計算錯誤: {e}")
+        return np.nan, np.nan
+
+def calculate_volatility(returns):
+    """計算年化波動率"""
+    if isinstance(returns, pd.DataFrame):
+        returns = returns.iloc[:, 0]
+    return returns.std() * np.sqrt(252)
+
+def calculate_sharpe(cagr, volatility, rf=0.015):
+    """計算夏普比率"""
+    return (cagr - rf) / volatility if volatility != 0 else np.nan
+
+def calculate_max_drawdown(prices):
+    """計算最大回撤"""
+    if isinstance(prices, pd.DataFrame):
+        prices = prices.iloc[:, 0]
+    cummax = prices.cummax()
+    drawdown = (prices - cummax) / cummax
+    return drawdown.min()
+
+def tracking_error(etf_returns, benchmark_returns):
+    """計算追蹤誤差"""
+    if isinstance(etf_returns, pd.DataFrame):
+        etf_returns = etf_returns.iloc[:, 0]
+    if isinstance(benchmark_returns, pd.DataFrame):
+        benchmark_returns = benchmark_returns.iloc[:, 0]
+    diff = etf_returns - benchmark_returns
+    return np.std(diff) * np.sqrt(252)
+
+def calculate_dividend_yield_yfinance(ticker, start_date, end_date):
+    """使用yfinance計算股息殖利率（備用方案）"""
+    try:
+        import yfinance as yf
+        from datetime import datetime, timedelta
+        
+        # 下載股息資料
+        stock = yf.Ticker(ticker)
+        dividends = stock.dividends
+        
+        if dividends.empty:
+            print(f"  ❌ {ticker} yfinance無股息資料")
+            return None
+        
+        # 取得期間內的股息（擴大搜尋範圍到過去1年）
+        search_start = datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=365)
+        search_start_str = search_start.strftime('%Y-%m-%d')
+        
+        period_dividends = dividends[(dividends.index >= search_start_str) & (dividends.index <= end_date)]
+        
+        if period_dividends.empty:
+            print(f"  📅 {ticker} yfinance期間內無股息記錄")
+            return None
+        
+        # 計算年化股息
+        annual_dividend = period_dividends.sum()
+        print(f"  💰 {ticker} yfinance期間股息總額: {annual_dividend:.4f}")
+        
+        # 獲取最新價格
+        current_price = get_latest_price(ticker, end_date)
+        if current_price and current_price > 0:
+            yield_rate = (annual_dividend / current_price) * 100
+            print(f"  🎯 {ticker} yfinance計算股息殖利率: {yield_rate:.2f}%")
+            return round(yield_rate, 2)
+        else:
+            print(f"  ❌ {ticker} 無法獲取有效價格")
+            return None
+        
+    except Exception as e:
+        print(f"  ❌ {ticker} yfinance股息計算失敗: {e}")
+        return None
+
+def calculate_dividend_yield(ticker, start_date, end_date):
+    """計算股息殖利率 - 優先使用TWSE官方資料"""
+    try:
+        print(f"  🔍 正在獲取 {ticker} 的股息資料...")
+        
+        # 提取股票代號（移除.TW後綴）
+        stock_id = ticker.replace('.TW', '')
+        print(f"  📊 查詢股票代號: {stock_id}")
+        
+        # 方法1：優先使用TWSE官方資料（台股ETF）
+        try:
+            twse_dividend_df = get_twse_dividend(stock_id)
+            
+            if not twse_dividend_df.empty:
+                print(f"  ✅ 從TWSE獲取到 {len(twse_dividend_df)} 筆配息記錄")
+                
+                # 轉換日期格式
+                from datetime import datetime
+                start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                
+                # 篩選期間內的配息（擴大到過去1年）
+                search_start = start_dt.replace(year=start_dt.year - 1)
+                
+                # 確保除息交易日欄位存在且為datetime
+                if '除息交易日' in twse_dividend_df.columns:
+                    twse_dividend_df = twse_dividend_df.dropna(subset=['除息交易日'])
+                    period_dividends = twse_dividend_df[
+                        (twse_dividend_df['除息交易日'] >= search_start) & 
+                        (twse_dividend_df['除息交易日'] <= end_dt)
+                    ]
+                    
+                    if not period_dividends.empty:
+                        # 計算總配息（假設配息欄位為'現金股利'）
+                        if '現金股利' in period_dividends.columns:
+                            total_dividend = period_dividends['現金股利'].sum()
+                            print(f"  💰 {ticker} 期間總配息: {total_dividend:.4f}")
+                            
+                            # 獲取最新價格
+                            current_price = get_latest_price(ticker, end_date)
+                            if current_price and current_price > 0:
+                                yield_rate = (total_dividend / current_price) * 100
+                                print(f"  🎯 {ticker} TWSE計算股息殖利率: {yield_rate:.2f}%")
+                                return round(yield_rate, 2)
+                        else:
+                            print(f"  ⚠️  {ticker} TWSE資料中找不到現金股利欄位")
+                    else:
+                        print(f"  📅 {ticker} 在查詢期間內無配息記錄")
+                else:
+                    print(f"  ⚠️  {ticker} TWSE資料中找不到除息交易日欄位")
+            else:
+                print(f"  📭 {ticker} TWSE無配息資料")
+        
+        except Exception as twse_error:
+            print(f"  ❌ TWSE查詢失敗: {twse_error}")
+        
+        # 方法2：備用方案 - 使用yfinance（美股ETF或TWSE失敗時）
+        print(f"  🔄 {ticker} 改用yfinance查詢...")
+        return calculate_dividend_yield_yfinance(ticker, start_date, end_date)
+        
+    except Exception as e:
+        print(f"  ❌ {ticker} 股息殖利率計算完全失敗: {e}")
+        return None
+
+def get_dividend_yield(ticker):
+    """從字典獲取股息殖利率"""
+    return dividend_yield_dict.get(ticker, 'N/A')
+
+def get_latest_price(ticker, end_date):
+    """獲取最新價格"""
+    try:
+        import yfinance as yf
+        from datetime import datetime, timedelta
+        
+        df = yf.download(ticker, start=end_date, end=end_date, progress=False)
+        if df.empty:
+            # 往前找5天
+            search_end = datetime.strptime(end_date, '%Y-%m-%d')
+            for i in range(1, 6):
+                search_date = (search_end - timedelta(days=i)).strftime('%Y-%m-%d')
+                df = yf.download(ticker, start=search_date, end=end_date, progress=False)
+                if not df.empty:
+                    break
+                    
+        if not df.empty:
+            current_price = df['Close'].iloc[-1]
+            if isinstance(current_price, pd.Series):
+                current_price = current_price.iloc[0]
+            print(f"  💰 {ticker} 最新價格: {current_price:.2f}")
+            return current_price
+        return None
+    except Exception as e:
+        print(f"  ❌ 獲取 {ticker} 價格失敗: {e}")
+        return None
+
+# 暫時手動設定股息殖利率字典（基於最新公開資料）
+dividend_yield_dict = {
+    # 主動型 ETF（成立較新，股息記錄較少）
+    '00980A.TW': 2.0,   # 野村台灣優選
+    '00981A.TW': 1.5,   # 統一台股增長
+    '00982A.TW': 2.0,   # 群益台灣強棒
+    '00983A.TW': 0.8,   # 中信ARK創新（科技股為主，殖利率較低）
+    '00984A.TW': 4.0,   # 安聯台灣高息（專注高股息）
+    '00985A.TW': 2.0,   # 野村台灣50
+    '00980D.TW': 3.5,   # 聯博投等入息（債券型，較高殖利率）
+    
+    # 被動型 ETF（成立較久，有實際股息記錄）
+    '0050.TW': 2.8,     # 台灣50
+    '006208.TW': 2.9,   # 富邦台50
+    '0056.TW': 5.5,     # 元大高股息
+    '00878.TW': 4.2,     # 國泰永續高股息
+    # 美股被動型 ETF
+    '00646.TW': 1.5,  # S&P500，成長導向，股息較低
+    '00662.TW': 0.7,  # NASDAQ，科技股為主，股息很低
+    '00757.TW': 0.4   # FANG+，成長股，股息極低
+}
+
+# 暫時手動設定換手率
+turnover_dict = {
+    # 主動型ETF
+    '00980A.TW': 80,
+    '00981A.TW': 75,
+    '00982A.TW': 70,
+    '00983A.TW': 25,    # ARK創新，主動但相對較低
+    '00984A.TW': 85,
+    '00985A.TW': 78,
+    '00980D.TW': 30,    # 債券型，換手率較低
+    # 台股被動型ETF
+    '0050.TW': 5,
+    '006208.TW': 6,
+    '0056.TW': 8,       # 高股息，會調整成分股
+    '00878.TW': 12,     # ESG篩選，稍高換手率
+    # 美股被動型ETF
+    '00646.TW': 8,   
+    '00662.TW': 12,  
+    '00757.TW': 15
+}
+
+
+def calculate_alpha_beta(etf_returns, benchmark_returns, rf_rate):
+    """計算Alpha和Beta
+    
+    Alpha = ETF年化報酬率 - (無風險利率 + Beta × (基準年化報酬率 - 無風險利率))
+    Beta = ETF報酬與基準報酬的協變數 / 基準報酬的方差
+    """
+    try:
+        # 確保長度相同，使用交集index
+        common_idx = etf_returns.index.intersection(benchmark_returns.index)
+        
+        if len(common_idx) < 2:
+            return np.nan, np.nan
+        
+        etf_ret = etf_returns.loc[common_idx]
+        bench_ret = benchmark_returns.loc[common_idx]
+        
+        # 計算Beta
+        covariance = np.cov(etf_ret, bench_ret)[0, 1]
+        bench_variance = np.var(bench_ret)
+        
+        if bench_variance == 0:
+            return np.nan, np.nan
+        
+        beta = covariance / bench_variance
+        
+        # 計算年化報酬率
+        periods_per_year = 252  # 交易日
+        total_periods = len(etf_ret)
+        years = total_periods / periods_per_year
+        
+        if years <= 0:
+            return np.nan, np.nan
+        
+        etf_annual_return = (((1 + etf_ret).prod()) ** (1 / years) - 1)
+        bench_annual_return = (((1 + bench_ret).prod()) ** (1 / years) - 1)
+        
+        # 計算Alpha
+        alpha = etf_annual_return - (rf_rate + beta * (bench_annual_return - rf_rate))
+        
+        return alpha * 100, beta  # Alpha 轉換為百分比
+        
+    except (ValueError, ZeroDivisionError):
+        return np.nan, np.nan
+
+
+def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_free_rate):
+    """獲取ETF數據並計算指標"""
+    try:
+        print(f"開始分析 {ticker}...")
+        
+        # 清理ticker格式
+        clean_ticker = ticker.strip()
+        print(f"  清理後的ticker: '{clean_ticker}'")
+        
+        df = yf.download(clean_ticker, start=common_start_date, end=end_date)
+        
+        if df.empty:
+            print(f"{clean_ticker} 無資料")
+            return None
+        
+        df.dropna(inplace=True)
+        
+        if len(df) < 10:
+            print(f"{clean_ticker} 有效資料太少")
+            return None
+            
+        # 提取價格和收益率
+        prices = df['Close']
+        if isinstance(prices, pd.DataFrame):
+            prices = prices.iloc[:, 0]
+        returns = prices.pct_change().dropna()
+
+        # 計算各項指標
+        cagr, data_years = calculate_returns(prices)
+        vol = calculate_volatility(returns)
+        sharpe = calculate_sharpe(cagr, vol, rf=risk_free_rate)
+        mdd = calculate_max_drawdown(prices)
+        
+        # 計算追蹤誤差
+        try:
+            if benchmark_returns is not None and len(benchmark_returns) > 0:
+                common_idx = returns.index.intersection(benchmark_returns.index)
+                if len(common_idx) > 10:
+                    te = tracking_error(returns.loc[common_idx], benchmark_returns.loc[common_idx])
+                else:
+                    te = np.nan
+            else:
+                te = np.nan
+        except:
+            te = np.nan
+        
+        # 三層股息殖利率策略：TWSE官方 -> yfinance -> 字典備案
+        print(f"📈 正在計算 {clean_ticker} 的股息殖利率...")
+        dividend_yield = calculate_dividend_yield(clean_ticker, common_start_date, end_date)
+        
+        if dividend_yield is None:
+            print(f"  🔄 {clean_ticker} 所有計算方法都失敗，使用預設字典值")
+            dividend_yield = dividend_yield_dict.get(clean_ticker, 'N/A')
+            if dividend_yield != 'N/A':
+                print(f"  ✅ {clean_ticker} 使用字典預設股息殖利率: {dividend_yield}%")
+            else:
+                print(f"  ⚠️  {clean_ticker} 字典中也無數據，設為 N/A")
+        else:
+            print(f"  🎯 {clean_ticker} 成功計算股息殖利率: {dividend_yield}%")
+
+        # 獲取其他資料
+        turnover = turnover_dict.get(clean_ticker, 'N/A')
+        expense = expense_ratio_dict.get(clean_ticker, 'N/A')
+        
+        print(f"  📊 {clean_ticker} 換手率: {turnover}%")
+        print(f"  💰 {clean_ticker} 管理費: {expense}%")
+
+        print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr:.2%}")
+        
+        # 計算 Alpha 和 Beta
+        alpha, beta = np.nan, np.nan
+        if benchmark_returns is not None and len(benchmark_returns) > 0:
+            alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
+        
+        return {
+            '證券代碼': clean_ticker,
+            '名稱': dict(etf_list)[ticker].strip(),  # 移除多餘空格
+            '資料期間 (年)': round(data_years, 2),
+            '年化報酬率 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
+            'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
+            'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
+            '夏普比率': round(sharpe, 2) if not pd.isna(sharpe) else 'N/A',
+            '年化波動率 (%)': round(vol*100, 2) if not pd.isna(vol) else 'N/A',
+            '最大回撤 (%)': round(mdd*100, 2) if not pd.isna(mdd) else 'N/A',
+            '追蹤誤差 (%)': round(te*100, 2) if not pd.isna(te) else 'N/A',
+            '換手率 (%)': turnover,  #turnover_dict.get(ticker, 'N/A'),
+            '管理費 (%)': expense,  #expense_ratio_dict.get(ticker, 'N/A'),  # 統一使用 '管理費 (%)'
+            '股息殖利率 (%)': dividend_yield
+        }
+    except Exception as e:
+        print(f"{ticker} 分析失敗: {e}")
+        return None
+    
+# 修正 matplotlib 後端設定，避免 tkinter 衝突
+def setup_matplotlib_backend():
+    """設定 matplotlib 後端，避免 tkinter 衝突"""
+    import matplotlib
+    
+    # 設定非互動式後端
+    matplotlib.use('Agg')  # 使用 Anti-Grain Geometry backend
+    
+    import matplotlib.pyplot as plt
+    
+    # 確保不會開啟 GUI 視窗
+    plt.ioff()  # 關閉互動模式
+    
+    return plt
+
+def setup_chinese_font():
+    """設定中文字體（已通過 font_config 改進版本）"""
+    # 字體配置已在導入時完成
+    pass
+
+
+def plot_turnover_bar(df_results):
+    """繪製換手率條形圖（Chart.js 格式）"""
+    labels = df_results['名稱'].tolist()
+    turnover = [float(x) if x != 'N/A' else 0 for x in df_results['換手率 (%)']]
+    return {
+        "type": "bar",
+        "data": {
+            "labels": labels,
+            "datasets": [{
+                "label": "換手率 (%)",
+                "data": turnover,
+                "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#C9CBCF", "#7BC225", "#FF5733", "#C70039", "#900C3F"],
+                "borderColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#C9CBCF", "#7BC225", "#FF5733", "#C70039", "#900C3F"],
+                "borderWidth": 1
+            }]
+        },
+        "options": {
+            "scales": {
+                "y": {
+                    "beginAtZero": True,
+                    "title": {"display": True, "text": "換手率 (%)"}
+                },
+                "x": {
+                    "title": {"display": True, "text": "ETF 名稱"}
+                }
+            },
+            "plugins": {
+                "legend": {"display": False},
+                "title": {"display": True, "text": "ETF 換手率比較"}
+            }
+        }
+    }
+
+def plot_radar_chart(df_results):
+    """繪製多指標雷達圖（分類拆分，使用不同標記）"""
+    from math import pi
+    import os
+    
+    plt = setup_matplotlib_backend()
+    setup_chinese_font()
+    
+    categories = ['年化報酬率', '夏普比率', '波動率(反)', '最大回撤(反)', '追蹤誤差(反)']
+    categories_en = ['Return', 'Sharpe', 'Low Volatility', 'Low Max DD', 'Low Tracking Error']
+    
+    N = len(categories)
+    angles = [n / float(N) * 2 * pi for n in range(N)]
+    angles += angles[:1]
+    
+    # 分類ETF資料
+    us_etfs = []
+    tw_stock_etfs = []
+    tw_dividend_etfs = []
+    
+    for _, row in df_results.iterrows():
+        ticker = row['證券代碼'].strip()
+        name = row['名稱'].strip()
+        
+        if ticker in ['00646.TW', '00662.TW', '00757.TW', '00983A.TW']:
+            us_etfs.append(row)
+        elif any(keyword in name for keyword in ['高股息', '高息', '永續']):
+            tw_dividend_etfs.append(row)
+        else:
+            tw_stock_etfs.append(row)
+    
+    # 收集數據範圍（基於全部資料）
+    all_returns, all_sharpe, all_vol, all_dd, all_te = [], [], [], [], []
+    
+    for _, row in df_results.iterrows():
+        if row['年化報酬率 (%)'] != 'N/A':
+            all_returns.append(float(row['年化報酬率 (%)']))
+        if row['夏普比率'] != 'N/A':
+            all_sharpe.append(float(row['夏普比率']))
+        if row['年化波動率 (%)'] != 'N/A':
+            all_vol.append(float(row['年化波動率 (%)']))
+        if row['最大回撤 (%)'] != 'N/A':
+            all_dd.append(float(row['最大回撤 (%)']))
+        if row['追蹤誤差 (%)'] != 'N/A':
+            all_te.append(float(row['追蹤誤差 (%)']))
+    
+    # 計算範圍
+    return_min, return_max = (min(all_returns), max(all_returns)) if all_returns else (0, 1)
+    sharpe_min, sharpe_max = (min(all_sharpe), max(all_sharpe)) if all_sharpe else (0, 1)
+    vol_min, vol_max = (min(all_vol), max(all_vol)) if all_vol else (0, 1)
+    dd_min, dd_max = (min(all_dd), max(all_dd)) if all_dd else (-1, 0)
+    te_min, te_max = (min(all_te), max(all_te)) if all_te else (0, 1)
+    
+    def normalize_value(value, min_val, max_val, reverse=False):
+        if min_val == max_val:
+            return 50
+        normalized = ((value - min_val) / (max_val - min_val)) * 100
+        if reverse:
+            normalized = 100 - normalized
+        return max(0, min(100, normalized))
+    
+    def plot_single_radar(etf_data, title, filename, colors, markers, linestyles):
+        """繪製單一雷達圖"""
+        fig, ax = plt.subplots(figsize=(12, 12), subplot_kw=dict(polar=True))
+        
+        for i, row in enumerate(etf_data):
+            ticker = row['證券代碼'].strip()
+            name = row['名稱'].strip()
+            
+            # 使用 smart_label_with_ticker 處理名稱
+            display_name = smart_label_with_ticker(name, ticker).replace('\n', ' ')
+            
+            # 計算標準化數值
+            values = []
+            ret_val = float(row['年化報酬率 (%)']) if row['年化報酬率 (%)'] != 'N/A' else return_min
+            values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
+            
+            sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
+            values.append(normalize_value(sharpe_val, sharpe_min, sharpe_max, reverse=False))
+            
+            vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
+            values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
+            
+            dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+            values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
+            
+            te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
+            values.append(normalize_value(te_val, te_min, te_max, reverse=True))
+            
+            values += values[:1]  # 閉合圖形
+            
+            # 取得顏色和標記
+            color = colors[i % len(colors)]
+            marker = markers[i % len(markers)]
+            linestyle = linestyles[i % len(linestyles)]
+            
+            # 繪製線條
+            ax.plot(angles, values, linewidth=3, linestyle=linestyle, 
+                    label=display_name, color=color, alpha=0.8)
+            ax.fill(angles, values, alpha=0.15, color=color)
+            
+            # 使用不同標記增加識別度
+            ax.scatter(angles[:-1], values[:-1], color=color, s=80, 
+                      marker=marker, alpha=0.9, zorder=5, edgecolors='black', linewidth=1)
+        
+        # 設定標籤和標題
+        ax.set_xticks(angles[:-1])
+        try:
+            ax.set_xticklabels(categories, fontsize=14, fontweight='bold')
+        except:
+            ax.set_xticklabels(categories_en, fontsize=14, fontweight='bold')
+        
+        ax.set_title(title, fontsize=18, pad=40, fontweight='bold')
+        ax.set_ylim(0, 100)
+        ax.set_yticks([20, 40, 60, 80, 100])
+        ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=12)
+        ax.grid(True, alpha=0.4)
+        
+        # 添加同心圓標籤
+        ax.text(0, 110, '100', ha='center', va='center', fontsize=12, alpha=0.7, fontweight='bold')
+        ax.text(0, 90, '80', ha='center', va='center', fontsize=12, alpha=0.7)
+        ax.text(0, 70, '60', ha='center', va='center', fontsize=12, alpha=0.7)
+        
+        # 圖例
+        legend = plt.legend(bbox_to_anchor=(1.15, 1.0), loc='upper left', 
+                           fontsize=10, frameon=True, fancybox=True, shadow=True,
+                           title='ETF 清單', title_fontsize=12)
+        
+        plt.tight_layout()
+        
+        # 儲存圖片到輸出資料夾
+        try:
+            output_path = os.path.join(output_folder, filename)
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"✅ {title}已儲存為: {output_path}")
+        except Exception as e:
+            try:
+                output_path = os.path.join(output_folder, filename)
+                plt.savefig(output_path, dpi=300, bbox_inches='tight')
+                print(f"✅ {title}已儲存為: {output_path}")
+            except:
+                print(f"❌ {title}儲存失敗: {e}")
+        
+        plt.close()
+    
+    # 1. 美股相關ETF雷達圖
+    if us_etfs:
+        us_colors = ['#4BC0C0', '#9966FF', '#FF5733', '#FF9F40']
+        us_markers = ['^', '^', '^', '^']
+        us_linestyles = ['-', '--', '-.', ':']
+        
+        plot_single_radar(us_etfs, 
+                         '美股相關ETF雷達圖\n△ 三角形標記', 
+                         'radar_us_etfs.png',
+                         us_colors, us_markers, us_linestyles)
+    
+    # 2. 台股股票型ETF雷達圖
+    if tw_stock_etfs:
+        stock_colors = ['#FF6384', '#36A2EB', '#FFCE56', '#7BC225', '#DC143C', '#32CD32']
+        stock_markers = ['o', 'o', 'o', 'o', 'o', 'o']
+        stock_linestyles = ['-', '--', '-.', ':', '-', '--']
+        
+        plot_single_radar(tw_stock_etfs, 
+                         '台股股票型ETF雷達圖\n● 圓形標記', 
+                         'radar_tw_stock.png',
+                         stock_colors, stock_markers, stock_linestyles)
+    
+    # 3. 台股高股息ETF雷達圖
+    if tw_dividend_etfs:
+        div_colors = ['#FF9F40', '#C70039', '#900C3F']
+        div_markers = ['s', 's', 's']
+        div_linestyles = ['-', '--', '-.']
+        
+        plot_single_radar(tw_dividend_etfs, 
+                         '台股高股息ETF雷達圖\n■ 方形標記', 
+                         'radar_tw_dividend.png',
+                         div_colors, div_markers, div_linestyles)
+    
+    # 4. 總覽雷達圖（所有ETF）
+    fig, ax = plt.subplots(figsize=(16, 16), subplot_kw=dict(polar=True))
+    
+    # 定義標記映射
+    marker_map = {
+        'us': '^',      # 三角形 - 美股
+        'stock': 'o',   # 圓形 - 台股股票型
+        'dividend': 's' # 方形 - 台股高股息型
+    }
+    
+    color_map = {
+        'us': ['#4BC0C0', '#9966FF', '#FF5733', '#FF9F40'],
+        'stock': ['#FF6384', '#36A2EB', '#FFCE56', '#7BC225', '#DC143C', '#32CD32'],
+        'dividend': ['#FF9F40', '#C70039', '#900C3F']
+    }
+    
+    all_etf_data = []
+    all_etf_data.extend([(row, 'us', i) for i, row in enumerate(us_etfs)])
+    all_etf_data.extend([(row, 'stock', i) for i, row in enumerate(tw_stock_etfs)])
+    all_etf_data.extend([(row, 'dividend', i) for i, row in enumerate(tw_dividend_etfs)])
+    
+    for row, etf_type, type_index in all_etf_data:
+        ticker = row['證券代碼'].strip()
+        name = row['名稱'].strip()
+        
+        # 使用 smart_label_with_ticker 處理名稱（總覽圖用更簡潔版本）
+        display_name = smart_label_with_ticker(name, ticker).replace('\n', ' ')
+        
+        # 計算標準化數值
+        values = []
+        ret_val = float(row['年化報酬率 (%)']) if row['年化報酬率 (%)'] != 'N/A' else return_min
+        values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
+        
+        sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
+        values.append(normalize_value(sharpe_val, sharpe_min, sharpe_max, reverse=False))
+        
+        vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
+        values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
+        
+        dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+        values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
+        
+        te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
+        values.append(normalize_value(te_val, te_min, te_max, reverse=True))
+        
+        values += values[:1]  # 閉合圖形
+        
+        # 取得顏色和標記
+        color = color_map[etf_type][type_index % len(color_map[etf_type])]
+        marker = marker_map[etf_type]
+        
+        # 根據主動/被動決定線型
+        if '主動' in name:
+            linestyle = '-'
+        else:
+            linestyle = '--'
+        
+        # 繪製線條
+        ax.plot(angles, values, linewidth=2.5, linestyle=linestyle, 
+                label=display_name, color=color, alpha=0.7)
+        ax.fill(angles, values, alpha=0.1, color=color)
+        
+        # 使用不同標記增加識別度
+        ax.scatter(angles[:-1], values[:-1], color=color, s=60, 
+                  marker=marker, alpha=0.9, zorder=5, edgecolors='black', linewidth=1)
+    
+    # 設定標籤和標題
+    ax.set_xticks(angles[:-1])
+    try:
+        ax.set_xticklabels(categories, fontsize=13, fontweight='bold')
+        title = 'ETF 總覽雷達圖\n△美股相關 ●台股股票型 ■台股高股息型'
+    except:
+        ax.set_xticklabels(categories_en, fontsize=13, fontweight='bold')
+        title = 'ETF Overview Radar Chart\n△US-Related ●TW-Stock ■TW-Dividend'
+    
+    ax.set_title(title, fontsize=18, pad=40, fontweight='bold')
+    ax.set_ylim(0, 100)
+    ax.set_yticks([20, 40, 60, 80, 100])
+    ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10)
+    ax.grid(True, alpha=0.4)
+    
+    # 添加同心圓標籤
+    ax.text(0, 110, '100', ha='center', va='center', fontsize=10, alpha=0.7)
+    ax.text(0, 90, '80', ha='center', va='center', fontsize=10, alpha=0.7)
+    ax.text(0, 70, '60', ha='center', va='center', fontsize=10, alpha=0.7)
+    
+    # 分兩列顯示圖例
+    handles, labels = ax.get_legend_handles_labels()
+    
+    # 計算每列顯示的項目數
+    n_items = len(labels)
+    n_cols = 2
+    n_rows = (n_items + n_cols - 1) // n_cols
+    
+    # 創建兩個圖例
+    first_half = handles[:n_rows], labels[:n_rows]
+    second_half = handles[n_rows:], labels[n_rows:]
+    
+    legend1 = plt.legend(first_half[0], first_half[1], 
+                        bbox_to_anchor=(1.15, 1.0), loc='upper left', 
+                        fontsize=9, frameon=True, fancybox=True, shadow=True,
+                        title='ETF 清單 (1)', title_fontsize=10)
+    
+    if second_half[0]:
+        legend2 = plt.legend(second_half[0], second_half[1], 
+                            bbox_to_anchor=(1.15, 0.5), loc='upper left', 
+                            fontsize=9, frameon=True, fancybox=True, shadow=True,
+                            title='ETF 清單 (2)', title_fontsize=10)
+        plt.gca().add_artist(legend1)
+    
+    # 添加標記說明
+    marker_legend_elements = [
+        plt.Line2D([0], [0], color='black', linewidth=0, marker='^', markersize=10, label='美股相關'),
+        plt.Line2D([0], [0], color='black', linewidth=0, marker='o', markersize=10, label='台股股票型'),
+        plt.Line2D([0], [0], color='black', linewidth=0, marker='s', markersize=10, label='台股高股息型')
+    ]
+    
+    legend3 = plt.legend(handles=marker_legend_elements, 
+                        bbox_to_anchor=(1.15, 0.2), loc='upper left',
+                        fontsize=11, frameon=True, fancybox=True, shadow=True,
+                        title='標記說明', title_fontsize=12)
+    plt.gca().add_artist(legend1)
+    if 'legend2' in locals():
+        plt.gca().add_artist(legend2)
+    
+    # 添加各指標冠軍信息
+    print(f"\n🏆 各指標冠軍:")
+    champion_info = []
+    
+    # 計算冠軍
+    metrics_data = {
+        '年化報酬率': ([], '年化報酬率 (%)'),
+        '夏普比率': ([], '夏普比率'),
+        '低波動': ([], '年化波動率 (%)'),
+        '低回撤': ([], '最大回撤 (%)'),
+        '低追蹤誤差': ([], '追蹤誤差 (%)'),
+    }
+    
+    for _, row in df_results.iterrows():
+        try:
+            metrics_data['年化報酬率'][0].append((float(row['年化報酬率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['夏普比率'][0].append((float(row['夏普比率']), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['低波動'][0].append((float(row['年化波動率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['低回撤'][0].append((float(row['最大回撤 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['低追蹤誤差'][0].append((float(row['追蹤誤差 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+        except (ValueError, KeyError):
+            pass
+    
+    # 找出冠軍
+    for metric_name, (data, _) in metrics_data.items():
+        if data:
+            if '低' in metric_name:
+                # 低的指標取最小值
+                champion = min(data, key=lambda x: x[0])
+                champion_info.append(f"  🏆 {metric_name}: {champion[2]} ({champion[1]}) = {champion[0]:.2f}")
+            else:
+                # 高的指標取最大值
+                champion = max(data, key=lambda x: x[0])
+                champion_info.append(f"  🏆 {metric_name}: {champion[2]} ({champion[1]}) = {champion[0]:.2f}")
+    
+    # 打印冠軍信息
+    for info in champion_info:
+        print(info)
+    
+    # 在圖表上添加冠軍信息文本
+    champion_text = '\n'.join([info.replace('  🏆 ', '') for info in champion_info])
+    fig.text(0.5, -0.05, f'各指標冠軍:\n{champion_text}', 
+             ha='center', fontsize=FONT_SIZE_CONFIG['label_medium'], 
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
+    
+    plt.tight_layout()
+    
+    # 儲存總覽圖到輸出資料夾
+    try:
+        output_path = os.path.join(output_folder, 'radar_overview.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        print(f"\n✅ 總覽雷達圖已儲存為: {output_path}")
+    except Exception as e:
+        try:
+            output_path = os.path.join(output_folder, 'radar_overview.png')
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"✅ 總覽雷達圖已儲存為: {output_path}")
+        except:
+            print(f"❌ 總覽雷達圖儲存失敗: {e}")
+    
+    plt.close()
+    
+    # 輸出分類摘要
+    print(f"\n📊 雷達圖分類摘要:")
+    print(f"  △ 美股相關ETF: {len(us_etfs)} 支")
+    print(f"  ● 台股股票型ETF: {len(tw_stock_etfs)} 支")
+    print(f"  ■ 台股高股息ETF: {len(tw_dividend_etfs)} 支")
+    print(f"  總計: {len(us_etfs) + len(tw_stock_etfs) + len(tw_dividend_etfs)} 支")
+
+def plot_price_trend(etf_dict):
+    """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）"""
+    plt = setup_matplotlib_backend()
+    setup_chinese_font()
+    
+    # 分類ETF
+    us_etfs = {}
+    tw_dividend_etfs = {}
+    tw_stock_etfs = {}
+    
+    for ticker, name in etf_dict.items():
+        ticker_clean = ticker.strip()
+        name_clean = name.strip()
+        
+        if ticker_clean in ['00646.TW', '00662.TW', '00757.TW', '00983A.TW']:
+            us_etfs[ticker_clean] = name_clean
+        elif any(keyword in name_clean for keyword in ['高股息', '高息', '永續']):
+            tw_dividend_etfs[ticker_clean] = name_clean
+        else:
+            tw_stock_etfs[ticker_clean] = name_clean
+    
+    # 1. 總覽圖（使用3年期間）
+    def plot_overview():
+        plt.figure(figsize=(16, 10))
+        
+        colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', 
+                  '#FF9F40', '#C9CBCF', '#7BC225', '#FF5733', '#C70039', '#8B4513']
+        
+        # 先繪製基準指數（較粗的線條）
+        try:
+            # 台股基準 - 加權指數
+            print("正在下載台股基準指數...")
+            tw_index = yf.download('^TWII', start=start_date_3y, end=latest_date, progress=False)
+            if not tw_index.empty:
+                tw_prices = tw_index['Close']
+                if isinstance(tw_prices, pd.DataFrame):
+                    tw_prices = tw_prices.iloc[:, 0]
+                tw_normalized = (tw_prices / tw_prices.iloc[0]) * 100
+                plt.plot(tw_normalized.index, tw_normalized, 
+                        label='台股加權指數', linewidth=3, color='#FF0000', 
+                        linestyle='--', alpha=0.8)
+        except Exception as e:
+            print(f"台股指數下載失敗: {e}")
+        
+        try:
+            # 美股基準 - S&P 500
+            print("正在下載美股基準指數...")
+            sp500_index = yf.download('^GSPC', start=start_date_3y, end=latest_date, progress=False)
+            if not sp500_index.empty:
+                sp500_prices = sp500_index['Close']
+                if isinstance(sp500_prices, pd.DataFrame):
+                    sp500_prices = sp500_prices.iloc[:, 0]
+                sp500_normalized = (sp500_prices / sp500_prices.iloc[0]) * 100
+                plt.plot(sp500_normalized.index, sp500_normalized, 
+                        label='S&P 500指數', linewidth=3, color='#0000FF', 
+                        linestyle='-.', alpha=0.8)
+        except Exception as e:
+            print(f"S&P 500指數下載失敗: {e}")
+        
+        # 繪製各ETF（較細的線條）
+        for i, (ticker, name) in enumerate(etf_dict.items()):
+            try:
+                df = yf.download(ticker.strip(), start=start_date_3y, end=latest_date, progress=False)
+                if not df.empty:
+                    prices = df['Close']
+                    if isinstance(prices, pd.DataFrame):
+                        prices = prices.iloc[:, 0]
+                    
+                    # 正規化為起始點100
+                    normalized_prices = (prices / prices.iloc[0]) * 100
+                    
+                    color = colors[i % len(colors)]
+                    line_style = '-'
+                    alpha = 0.7
+                    
+                    # 使用 smart_label_with_ticker 命名
+                    display_name = smart_label_with_ticker(name.strip(), ticker.strip()).replace('\n', ' ')
+                    
+                    plt.plot(normalized_prices.index, normalized_prices, 
+                            label=display_name, linewidth=2, color=color, 
+                            linestyle=line_style, alpha=alpha)
+            except Exception as e:
+                print(f"{ticker} 折線圖繪製失敗: {e}")
+        
+        # 設定標題和標籤
+        try:
+            plt.title('ETF vs 基準指數總覽 (基準點=100)\n紅線：台股加權 | 藍線：S&P500', 
+                     fontsize=16, fontweight='bold')
+            plt.xlabel('日期', fontsize=12)
+            plt.ylabel('相對淨值 (起始=100)', fontsize=12)
+        except:
+            plt.title('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500', 
+                     fontsize=16, fontweight='bold')
+            plt.xlabel('Date', fontsize=12)
+            plt.ylabel('Relative NAV (Start=100)', fontsize=12)
+        
+        plt.grid(True, alpha=0.3)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
+                   fontsize=9, frameon=True, fancybox=True, shadow=True,
+                   title='圖例', title_fontsize=10)
+        plt.axhline(y=100, color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
+        plt.tight_layout()
+        
+        # 儲存總覽圖到輸出資料夾
+        try:
+            output_path = os.path.join(output_folder, 'trend_overview.png')
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"✅ 總覽趨勢圖已儲存為: {output_path}")
+        except Exception as e:
+            try:
+                output_path = os.path.join(output_folder, 'trend_overview.png')
+                plt.savefig(output_path, dpi=300, bbox_inches='tight')
+                print(f"✅ 總覽趨勢圖已儲存為: {output_path}")
+            except:
+                print(f"❌ 總覽趨勢圖儲存失敗: {e}")
+        
+        plt.close()
+    
+    # 2. 子圖函數：以基準指數正規化
+    def plot_category_trend(etf_group, benchmark_ticker, benchmark_name, category_name, filename, benchmark_color):
+        """繪製分類趨勢圖，以基準指數為標準正規化"""
+        
+        if not etf_group:
+            print(f"⚠️  {category_name}無ETF資料，跳過")
+            return
+        
+        # 找出該組ETF的最晚上市日期
+        latest_etf_start = None
+        etf_start_dates = {}
+        
+        print(f"\n🔍 檢查{category_name}ETF上市日期...")
+        for ticker in etf_group.keys():
+            try:
+                # 從很早的日期開始搜尋，找出實際上市日
+                search_start = '2020-01-01'
+                df = yf.download(ticker, start=search_start, end=latest_date, progress=False)
+                if not df.empty:
+                    df.dropna(inplace=True)
+                    if len(df) > 0:
+                        etf_start = df.index[0]
+                        etf_start_dates[ticker] = etf_start
+                        print(f"  {ticker}: 上市於 {etf_start.strftime('%Y-%m-%d')}")
+                        
+                        if latest_etf_start is None or etf_start > latest_etf_start:
+                            latest_etf_start = etf_start
+            except Exception as e:
+                print(f"  {ticker} 日期檢查失敗: {e}")
+        
+        if latest_etf_start is None:
+            print(f"❌ {category_name}無法確定比較起始日期")
+            return
+        
+        comparison_start = latest_etf_start.strftime('%Y-%m-%d')
+        print(f"📅 {category_name}統一比較期間: {comparison_start} 至 {latest_date}")
+        
+        plt.figure(figsize=(14, 8))
+        
+        # 下載並繪製基準指數（作為正規化基準）
+        benchmark_data = None
+        try:
+            print(f"📊 下載{benchmark_name}基準資料...")
+            benchmark_df = yf.download(benchmark_ticker, start=comparison_start, end=latest_date, progress=False)
+            if not benchmark_df.empty:
+                benchmark_prices = benchmark_df['Close']
+                if isinstance(benchmark_prices, pd.DataFrame):
+                    benchmark_prices = benchmark_prices.iloc[:, 0]
+                
+                # 基準指數設為100基準線
+                benchmark_normalized = (benchmark_prices / benchmark_prices.iloc[0]) * 100
+                benchmark_data = benchmark_prices  # 保存原始價格用於正規化
+                
+                plt.plot(benchmark_normalized.index, benchmark_normalized, 
+                        label=f'{benchmark_name} (基準)', linewidth=4, color=benchmark_color, 
+                        linestyle='-', alpha=0.9, zorder=10)
+        except Exception as e:
+            print(f"{benchmark_name}基準下載失敗: {e}")
+        
+        # 繪製該組ETF，以基準指數正規化
+        colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C70039', '#7BC225']
+        
+        for i, (ticker, name) in enumerate(etf_group.items()):
+            try:
+                df = yf.download(ticker, start=comparison_start, end=latest_date, progress=False)
+                if not df.empty:
+                    etf_prices = df['Close']
+                    if isinstance(etf_prices, pd.DataFrame):
+                        etf_prices = etf_prices.iloc[:, 0]
+                    
+                    if benchmark_data is not None:
+                        # 對齊日期索引
+                        common_dates = etf_prices.index.intersection(benchmark_data.index)
+                        if len(common_dates) > 10:
+                            etf_aligned = etf_prices.loc[common_dates]
+                            benchmark_aligned = benchmark_data.loc[common_dates]
+                            
+                            # 以基準指數為標準正規化：(ETF/ETF_start) / (Benchmark/Benchmark_start) * 100
+                            etf_relative = (etf_aligned / etf_aligned.iloc[0]) / (benchmark_aligned / benchmark_aligned.iloc[0]) * 100
+                        else:
+                            # 如果對齊失敗，使用傳統正規化
+                            etf_relative = (etf_prices / etf_prices.iloc[0]) * 100
+                    else:
+                        # 如果沒有基準資料，使用傳統正規化
+                        etf_relative = (etf_prices / etf_prices.iloc[0]) * 100
+                    
+                    color = colors[i % len(colors)]
+                    
+                    # 使用 smart_label_with_ticker 命名
+                    display_name = smart_label_with_ticker(name, ticker).replace('\n', ' ')
+                    
+                    # 主動型ETF用實線，被動型用虛線
+                    line_style = '-' if '主動' in name else '--'
+                    
+                    plt.plot(etf_relative.index, etf_relative, 
+                            label=display_name, linewidth=2.5, color=color, 
+                            linestyle=line_style, alpha=0.8)
+            except Exception as e:
+                print(f"  {ticker} 繪製失敗: {e}")
+        
+        # 設定標題和標籤
+        try:
+            if benchmark_data is not None:
+                title = f'{category_name} vs {benchmark_name}\n相對表現 (基準指數=100基準線)'
+                ylabel = f'相對表現 (vs {benchmark_name})'
+            else:
+                title = f'{category_name} 表現比較\n(各自起始點=100)'
+                ylabel = '相對淨值 (起始=100)'
+            
+            plt.title(title, fontsize=14, fontweight='bold')
+            plt.xlabel('日期', fontsize=12)
+            plt.ylabel(ylabel, fontsize=12)
+        except:
+            plt.title(f'{category_name} Performance', fontsize=14, fontweight='bold')
+            plt.xlabel('Date', fontsize=12)
+            plt.ylabel('Relative Performance', fontsize=12)
+        
+        # 添加重要參考線
+        plt.axhline(y=100, color='gray', linestyle='-', linewidth=1, alpha=0.7, label='基準線')
+        plt.axhline(y=110, color='green', linestyle=':', linewidth=1, alpha=0.5, label='+10%')
+        plt.axhline(y=90, color='red', linestyle=':', linewidth=1, alpha=0.5, label='-10%')
+        
+        plt.grid(True, alpha=0.3)
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
+                   fontsize=10, frameon=True, fancybox=True, shadow=True,
+                   title=f'{category_name}\n實線：主動型\n虛線：被動型', title_fontsize=9)
+        plt.tight_layout()
+        
+        # 儲存子圖到輸出資料夾
+        try:
+            output_path = os.path.join(output_folder, filename)
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"✅ {category_name}趨勢圖已儲存為: {output_path}")
+        except Exception as e:
+            try:
+                output_path = os.path.join(output_folder, filename)
+                plt.savefig(output_path, dpi=300, bbox_inches='tight')
+                print(f"✅ {category_name}趨勢圖已儲存為: {output_path}")
+            except:
+                print(f"❌ {category_name}趨勢圖儲存失敗: {e}")
+        
+        plt.close()
+    
+    # 執行繪製
+    print("📈 開始繪製趨勢圖...")
+    
+    # 總覽圖
+    plot_overview()
+    
+    # 美股相關ETF vs S&P500
+    plot_category_trend(
+        us_etfs, 
+        '^GSPC', 
+        'S&P500', 
+        '美股相關ETF', 
+        'trend_us_etfs.png',
+        '#0066CC'
+    )
+    
+    # 台股高股息ETF vs 元大高股息(0056)
+    plot_category_trend(
+        tw_dividend_etfs, 
+        '0056.TW', 
+        '元大高股息', 
+        '台股高股息ETF', 
+        'trend_tw_dividend.png',
+        '#FF6600'
+    )
+    
+    # 台股股票型ETF vs 台灣50(0050)
+    plot_category_trend(
+        tw_stock_etfs, 
+        '0050.TW', 
+        '台灣50', 
+        '台股股票型ETF', 
+        'trend_tw_stock.png',
+        '#CC0000'
+    )
+    
+    print(f"\n📊 趨勢圖繪製完成！")
+    print(f"✅ 總覽圖: trend_overview.png")
+    print(f"✅ 美股相關: trend_us_etfs.png")
+    print(f"✅ 台股高股息: trend_tw_dividend.png") 
+    print(f"✅ 台股股票型: trend_tw_stock.png")
+    
+    # 輸出分析摘要
+    print(f"\n📊 趨勢圖分析方式:")
+    print(f"  📈 總覽圖: 3年期間，各自起始點=100")
+    print(f"  📊 子圖: 以最晚上市ETF為起始，基準指數=100")
+    print(f"  🎯 相對表現: >100表示跑贏基準，<100表示跑輸基準")
+    print(f"  📏 實線/虛線: 區分主動型/被動型ETF")
+
+
+def plot_multi_metrics_comparison(df_results):
+    """繪製多指標柱狀圖：年化報酬率、Alpha、Beta、夏普比率、MDD、標準差、費用率、追蹤誤差"""
+    plt = setup_matplotlib_backend()
+    setup_chinese_font()
+
+    print("\n📊 繪製多指標比較柱狀圖...")
+    
+    # 準備數據
+    metrics = {
+        '年化報酬率 (%)': {'col': '年化報酬率 (%)', 'color': '#FF6384', 'format': '.2f'},
+        'Alpha (%)': {'col': 'Alpha', 'color': '#36A2EB', 'format': '.2f'},
+        'Beta': {'col': 'Beta', 'color': '#4BC0C0', 'format': '.2f'},
+        '夏普比率': {'col': '夏普比率', 'color': '#FF9F40', 'format': '.2f'},
+        '最大回撤 (%)': {'col': '最大回撤 (%)', 'color': '#FF5733', 'format': '.2f'},
+        '標準差 (%)': {'col': '年化波動率 (%)', 'color': '#9966FF', 'format': '.2f'},
+        '費用率 (%)': {'col': '管理費 (%)', 'color': '#FFCE56', 'format': '.2f'},
+        '追蹤誤差 (%)': {'col': '追蹤誤差 (%)', 'color': '#C9CBCF', 'format': '.2f'},
+    }
+    
+    # 創建 2x4 子圖佈局
+    fig, axes = plt.subplots(2, 4, figsize=(24, 12))
+    axes = axes.flatten()
+    
+    # 排序ETF：按年化報酬率降序
+    df_sorted = df_results.sort_values('年化報酬率 (%)', ascending=False)
+    
+    tickers = df_sorted['證券代碼'].str.strip().values
+    names = df_sorted['名稱'].str.strip().values
+    
+    # 為每個指標繪製柱狀圖
+    for idx, (metric_name, metric_info) in enumerate(metrics.items()):
+        ax = axes[idx]
+        col = metric_info['col']
+        color = metric_info['color']
+        fmt = metric_info['format']
+        
+        # 獲取數據
+        try:
+            values = pd.to_numeric(df_sorted[col], errors='coerce').fillna(0)
+        except KeyError:
+            print(f"  ⚠️  警告: 未找到欄位 '{col}'，跳過此指標")
+            ax.text(0.5, 0.5, f'缺少數據: {col}', ha='center', va='center', 
+                   transform=ax.transAxes, fontsize=10)
+            continue
+        
+        # 繪製柱狀圖
+        x_pos = np.arange(len(names))
+        bars = ax.bar(x_pos, values, color=color, alpha=0.7, edgecolor='black', linewidth=1)
+        
+        # 添加數值標籤
+        for bar, val in zip(bars, values):
+            if pd.notna(val) and val != 0:
+                height = bar.get_height()
+                label_y = height + (max(values) * 0.02) if height >= 0 else height - (max(values) * 0.05)
+                ax.text(bar.get_x() + bar.get_width()/2., label_y,
+                       f'{val:{fmt}}', ha='center', va='bottom' if height >= 0 else 'top',
+                       fontsize=9, fontweight='bold')
+        
+        # 設置標題和標籤
+        ax.set_title(metric_name, fontsize=FONT_SIZE_CONFIG['title_small'], fontweight='bold', pad=10)
+        ax.set_ylabel('數值', fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
+        ax.set_xticks(x_pos)
+        
+        # 簡化X軸標籤（只顯示代碼）
+        ax.set_xticklabels([t.replace('.TW', '') for t in tickers], 
+                           rotation=45, ha='right', fontsize=9)
+        
+        # 網格和零線
+        ax.grid(True, alpha=0.3, axis='y')
+        if values.min() < 0 < values.max():
+            ax.axhline(y=0, color='black', linestyle='-', linewidth=0.8)
+        
+        # 找出冠軍（最高值）
+        if pd.notna(values).any():
+            max_idx = values.idxmax()
+            champion_name = df_sorted.iloc[values.values.tolist().index(values[max_idx])]['名稱'].strip()
+            champion_ticker = df_sorted.iloc[values.values.tolist().index(values[max_idx])]['證券代碼'].strip()
+            max_val = values[max_idx]
+            print(f"  🏆 {metric_name}: {champion_ticker} ({champion_name}) - {max_val:{fmt}}")
+    
+    # 總標題
+    fig.suptitle('ETF 多指標性能比較表', fontsize=FONT_SIZE_CONFIG['title_large'], 
+                fontweight='bold', y=0.995)
+    
+    # 添加說明
+    fig.text(0.5, 0.01, '包含: 年化報酬率、Alpha、Beta、夏普比率、最大回撤、標準差、費用率、追蹤誤差',
+             ha='center', fontsize=FONT_SIZE_CONFIG['figure_text'], style='italic')
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.96, bottom=0.08)
+    
+    # 保存圖表
+    try:
+        output_path = os.path.join(output_folder, 'etf_multi_metrics_comparison.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        print(f"\n✅ 多指標圖表已儲存: {output_path}")
+    except Exception as e:
+        print(f"❌ 保存多指標圖表失敗: {e}")
+    
+    plt.close()
+
+
+def plot_performance_comparison(df_results):
+    """繪製績效比較柱狀圖 - 自動根據 ETF 類型生成 _TW 或 _US 版本"""
+    plt = setup_matplotlib_backend()
+    setup_chinese_font()
+
+    print("\n📊 繪製績效比較柱狀圖...")
+    
+    # 分類 ETF
+    taiwan_etfs = []
+    us_etfs = []
+    
+    for _, row in df_results.iterrows():
+        name = row['名稱'].strip()
+        ticker = row['證券代碼'].strip()
+        ret = float(row['年化報酬率 (%)'])
+        
+        # 分類邏輯：美股 vs 台股
+        if '美股' in name or 'US' in name or any(code in ticker for code in ['00646', '00662', '00757', '00983A']):
+            us_etfs.append((name, ret, ticker))
+            print(f"  ✅ 美股: {ticker:12} - {ret:7.2f}%")
+        else:
+            taiwan_etfs.append((name, ret, ticker))
+            print(f"  🔵 台股: {ticker:12} - {ret:7.2f}%")
+    
+    # 先下載基準數據（Y軸調整需要用到）
+    print("  📥 下載基準指數...")
+    benchmark_data = {}
+    
+    try:
+        # 台股基準
+        benchmark_0050 = yf.download('0050.TW', start=common_start_date, end=latest_date, progress=False)
+        benchmark_006208 = yf.download('006208.TW', start=common_start_date, end=latest_date, progress=False)
+        
+        if isinstance(benchmark_0050, pd.DataFrame) and not benchmark_0050.empty:
+            ret_0050 = float(((benchmark_0050['Close'].iloc[-1] / benchmark_0050['Close'].iloc[0]) ** (252 / len(benchmark_0050)) - 1) * 100)
+            benchmark_data['0050'] = ('0050 台灣50', ret_0050)
+        
+        if isinstance(benchmark_006208, pd.DataFrame) and not benchmark_006208.empty:
+            ret_006208 = float(((benchmark_006208['Close'].iloc[-1] / benchmark_006208['Close'].iloc[0]) ** (252 / len(benchmark_006208)) - 1) * 100)
+            benchmark_data['006208'] = ('006208 富邦台50', ret_006208)
+        
+        # 美股基準
+        if us_etfs:
+            voo = yf.download('VOO', start=common_start_date, end=latest_date, progress=False)
+            sp500 = yf.download('^GSPC', start=common_start_date, end=latest_date, progress=False)
+            
+            if isinstance(voo, pd.DataFrame) and not voo.empty:
+                ret_voo = float(((voo['Close'].iloc[-1] / voo['Close'].iloc[0]) ** (252 / len(voo)) - 1) * 100)
+                benchmark_data['VOO'] = ('VOO S&P500', ret_voo)
+            elif isinstance(sp500, pd.DataFrame) and not sp500.empty:
+                ret_sp500 = float(((sp500['Close'].iloc[-1] / sp500['Close'].iloc[0]) ** (252 / len(sp500)) - 1) * 100)
+                benchmark_data['SP500'] = ('^GSPC S&P500', ret_sp500)
+    except Exception as e:
+        print(f"  ⚠️  基準下載失敗: {e}")
+    
+    # 計算Y軸範圍（包含基準數據）
+    all_returns_for_scale = [item[1] for item in taiwan_etfs + us_etfs]
+    # 也加上基準數據
+    for key in ['0050', '006208', 'VOO', 'SP500']:
+        if key in benchmark_data:
+            all_returns_for_scale.append(benchmark_data[key][1])
+    
+    if all_returns_for_scale:
+        # 自動調整 Y 軸，留出足夠空間顯示標籤
+        data_min = min(all_returns_for_scale)
+        data_max = max(all_returns_for_scale)
+        data_range = data_max - data_min if data_max != data_min else 1
+        
+        # 留出 15% 上下空間
+        y_min = data_min - data_range * 0.15
+        y_max = data_max + data_range * 0.15
+    else:
+        y_min, y_max = -10, 50
+    
+    # 繪製台股 ETF 圖表（_TW 版本）
+    if taiwan_etfs:
+        print(f"\n  📊 生成台股 ETF 柱狀圖 (_TW)...")
+        fig, ax = plt.subplots(figsize=(16, 9))
+        
+        names = [item[0] for item in taiwan_etfs]
+        returns = [item[1] for item in taiwan_etfs]
+        tickers = [item[2] for item in taiwan_etfs]
+        
+        # 根據名稱判斷顏色：主動型 vs 被動型 vs 高股息
+        colors = []
+        for name in names:
+            if '主動' in name:
+                colors.append('#FF6384')  # 紅色 - 主動型
+            elif any(keyword in name for keyword in ['高股息', '高息', '永續', '股利']):
+                colors.append('#FF9F40')  # 橙色 - 高股息
+            else:
+                colors.append('#36A2EB')  # 藍色 - 一般被動型
+        
+        # 添加基準數據
+        benchmark_names = []
+        benchmark_returns = []
+        benchmark_colors = []
+        for key in ['0050', '006208']:
+            if key in benchmark_data:
+                name, ret = benchmark_data[key]
+                benchmark_names.append(name)
+                benchmark_returns.append(ret)
+                benchmark_colors.append('#D3D3D3')  # 灰色 - 基準
+        
+        # 合併數據
+        all_names = names + benchmark_names
+        all_returns = returns + benchmark_returns
+        all_colors = colors + benchmark_colors
+        
+        x_pos = np.arange(len(all_names))
+        bars = ax.bar(x_pos, all_returns, color=all_colors, alpha=0.7, edgecolor='black', linewidth=1.5)
+        
+        # 添加數值標籤
+        for bar, ret in zip(bars, all_returns):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                   f'{ret:.1f}%', ha='center', va='bottom',
+                   fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
+        
+        ax.set_title('台股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_xticks(x_pos)
+        
+        # 改進 X 軸標籤：顯示完整的 ETF 名稱 + 代碼，垂直排列
+        labels = []
+        for i, name in enumerate(all_names):
+            if i < len(names):
+                # ETF：顯示完整名稱
+                ticker = tickers[i].replace('.TW', '')
+                etf_name = names[i]
+                labels.append(f"{ticker} {etf_name}")
+            else:
+                # 基準：顯示完整名稱
+                labels.append(name)
+        
+        # 垂直排列標籤
+        ax.set_xticklabels(labels, rotation=90, fontsize=FONT_SIZE_CONFIG['tick_small'], ha='right')
+        
+        # 增加底部空間以容納垂直標籤
+        plt.subplots_adjust(bottom=0.35)
+        
+        ax.set_ylim(y_min, y_max)
+        ax.grid(True, alpha=0.3, axis='y')
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
+        
+        # 圖例
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#FF6384', label='主動型 ETF'),
+            Patch(facecolor='#FF9F40', label='高股息 ETF'),
+            Patch(facecolor='#36A2EB', label='一般被動型 ETF'),
+            Patch(facecolor='#D3D3D3', label='基準指數（灰色）'),
+        ]
+        ax.legend(handles=legend_elements, loc='upper center', 
+                 bbox_to_anchor=(0.5, -0.15), ncol=4, 
+                 fontsize=FONT_SIZE_CONFIG['legend'], frameon=True, fancybox=True, shadow=True)
+        
+        plt.tight_layout()
+        
+        # 保存
+        try:
+            output_path = os.path.join(output_folder, 'etf_performance_comparison_TW.png')
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"  ✅ 台股 ETF 柱狀圖已儲存: etf_performance_comparison_TW.png")
+        except Exception as e:
+            print(f"  ❌ 保存失敗: {e}")
+        
+        plt.close()
+    
+    # 繪製美股 ETF 圖表（_US 版本）
+    if us_etfs:
+        print(f"\n  📊 生成美股 ETF 柱狀圖 (_US)...")
+        fig, ax = plt.subplots(figsize=(14, 9))
+        
+        names = [item[0] for item in us_etfs]
+        returns = [item[1] for item in us_etfs]
+        tickers = [item[2] for item in us_etfs]
+        
+        # 美股 ETF 顏色
+        color_map = {
+            '00983A': '#FF9F40',  # ARK創新 - 橙色
+            '00646': '#4BC0C0',   # S&P500 - 青色
+            '00662': '#9966FF',   # NASDAQ - 紫色
+            '00757': '#FF5733',   # FANG+ - 紅橙色
+        }
+        
+        colors = []
+        for ticker in tickers:
+            found = False
+            for code, color in color_map.items():
+                if code in ticker:
+                    colors.append(color)
+                    found = True
+                    break
+            if not found:
+                colors.append('#8B7355')
+        
+        # 添加基準數據
+        benchmark_names = []
+        benchmark_returns = []
+        benchmark_colors = []
+        for key in ['VOO', 'SP500']:
+            if key in benchmark_data:
+                name, ret = benchmark_data[key]
+                benchmark_names.append(name)
+                benchmark_returns.append(ret)
+                benchmark_colors.append('#D3D3D3')
+        
+        # 合併數據
+        all_names = names + benchmark_names
+        all_returns = returns + benchmark_returns
+        all_colors = colors + benchmark_colors
+        
+        x_pos = np.arange(len(all_names))
+        bars = ax.bar(x_pos, all_returns, color=all_colors, alpha=0.7, edgecolor='black', linewidth=1.5)
+        
+        # 添加數值標籤
+        for bar, ret in zip(bars, all_returns):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.5,
+                   f'{ret:.1f}%', ha='center', va='bottom',
+                   fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
+        
+        ax.set_title('美股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_xticks(x_pos)
+        
+        # 改進 X 軸標籤：顯示完整的 ETF 名稱 + 代碼，垂直排列
+        labels = []
+        for i, name in enumerate(all_names):
+            if i < len(names):
+                # ETF：顯示完整名稱
+                ticker = tickers[i].replace('.TW', '')
+                etf_name = names[i]
+                labels.append(f"{ticker} {etf_name}")
+            else:
+                # 基準：顯示完整名稱
+                labels.append(name)
+        
+        # 垂直排列標籤
+        ax.set_xticklabels(labels, rotation=90, fontsize=FONT_SIZE_CONFIG['tick_small'], ha='right')
+        
+        # 增加底部空間以容納垂直標籤
+        plt.subplots_adjust(bottom=0.35)
+        
+        ax.set_ylim(y_min, y_max)
+        ax.grid(True, alpha=0.3, axis='y')
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
+        
+        # 圖例
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='#FF9F40', label='ARK創新'),
+            Patch(facecolor='#4BC0C0', label='S&P500相關'),
+            Patch(facecolor='#9966FF', label='NASDAQ相關'),
+            Patch(facecolor='#FF5733', label='FANG+相關'),
+            Patch(facecolor='#D3D3D3', label='基準指數（灰色）'),
+        ]
+        ax.legend(handles=legend_elements, loc='upper center', 
+                 bbox_to_anchor=(0.5, -0.15), ncol=5, 
+                 fontsize=FONT_SIZE_CONFIG['legend'], frameon=True, fancybox=True, shadow=True)
+        
+        plt.tight_layout()
+        
+        # 保存
+        try:
+            output_path = os.path.join(output_folder, 'etf_performance_comparison_US.png')
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"  ✅ 美股 ETF 柱狀圖已儲存: etf_performance_comparison_US.png")
+        except Exception as e:
+            print(f"  ❌ 保存失敗: {e}")
+        
+        plt.close()
+
+
+if __name__ == '__main__':
+    # 首先設定 matplotlib 後端
+    plt = setup_matplotlib_backend()
+
+    # 1. 找出統一的比較期間
+    common_start_date = find_common_start_date(etf_list, start_date_3y, latest_date)
+    
+    # 2. 下載0050作為基準（用於計算追蹤誤差）
+    print(f"\n下載基準指數 0050...")
+    try:
+        # 台股基準
+        benchmark_df = yf.download('0050.TW,006208.TW,0056.TW,00878.TW', start=common_start_date, end=latest_date)
+        if not benchmark_df.empty:
+            benchmark_prices = benchmark_df['Close']
+            if isinstance(benchmark_prices, pd.DataFrame):
+                benchmark_prices = benchmark_prices.iloc[:, 0]
+            benchmark_returns = benchmark_prices.pct_change().dropna()
+            print(f"基準資料期間: {len(benchmark_returns)} 個交易日")
+        else:
+            benchmark_returns = None
+        
+        # 美股基準 - S&P 500（用於視覺化比較）
+        sp500_df = yf.download('^GSPC', start=common_start_date, end=latest_date, progress=False)
+        if not sp500_df.empty:
+            sp500_prices = sp500_df['Close']
+            if isinstance(sp500_prices, pd.DataFrame):
+                sp500_prices = sp500_prices.iloc[:, 0]
+            sp500_returns = sp500_prices.pct_change().dropna()
+            print(f"美股基準資料期間: {len(sp500_returns)} 個交易日")
+        else:
+            sp500_returns = None
+    except:
+        print(f"基準指數下載失敗: {e}")
+        benchmark_returns = None
+        sp500_returns = None
+    
+    # 3. 分析所有ETF
+    print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
+    results = []
+    for ticker, name in etf_list:
+        data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate)
+        if data:
+            results.append(data)
+    
+    # 4. 顯示結果
+    if results:
+        df_results = pd.DataFrame(results)
+        
+        # 按年化報酬率排序
+        df_results = df_results.sort_values('年化報酬率 (%)', ascending=False)
+        
+        print(f"\n{'='*180}")
+        print(f"ETF 比較分析結果（統一期間: {common_start_date} 至 {latest_date}）")
+        print(f"{'='*180}")
+
+        # 修正後的表格標題 - 單行不換行
+        print(f"{'證券代碼':<12} {'名稱':<20} {'期間(年)':<8} {'年化報酬率(%)':<12} {'夏普比率':<9} {'波動率(%)':<9} {'最大回撤(%)':<11} {'追蹤誤差(%)':<11} {'換手率(%)':<9} {'管理費(%)':<9} {'股息殖利率(%)':<12}")
+        print('-' * 180)
+
+        for _, row in df_results.iterrows():
+            # 處理 N/A 和 nan 值的顯示
+            def format_value(val, decimal_places=2):
+                if val == 'N/A' or pd.isna(val):
+                    return 'N/A'
+                try:
+                    if isinstance(val, (int, float)):
+                        return f"{val:.{decimal_places}f}"
+                    return str(val)
+                except:
+                    return 'N/A'
+            
+            # 格式化各欄位
+            ticker = row['證券代碼']
+            name = row['名稱'][:18] + '..' if len(row['名稱']) > 20 else row['名稱']  # 限制名稱長度
+            period = format_value(row['資料期間 (年)'], 2)
+            annual_return = format_value(row['年化報酬率 (%)'], 2)
+            sharpe = format_value(row['夏普比率'], 2)
+            volatility = format_value(row['年化波動率 (%)'], 2)
+            max_dd = format_value(row['最大回撤 (%)'], 2)
+            tracking_error = format_value(row['追蹤誤差 (%)'], 2)
+            turnover = format_value(row['換手率 (%)'], 0)
+            expense = format_value(row['管理費 (%)'], 2)
+            dividend_yield = format_value(row['股息殖利率 (%)'], 1)
+            
+            print(f"{ticker:<12} {name:<20} {period:<8} {annual_return:<12} {sharpe:<9} {volatility:<9} {max_dd:<11} {tracking_error:<11} {turnover:<9} {expense:<9} {dividend_yield:<12}")
+
+        print('-' * 180)
+
+        # 儲存結果到輸出資料夾
+        csv_path = os.path.join(output_folder, 'etf_comparison_unified.csv')
+        df_results.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        print(f"\n結果已儲存至 {csv_path}")
+        
+        # 顯示統計摘要
+        print(f"\n{'='*60}")
+        print("統計摘要:")
+        print(f"共分析 {len(results)} 支ETF")
+        print(f"統一比較期間: {df_results['資料期間 (年)'].iloc[0]:.2f} 年")
+        
+        # 計算數值型欄位的平均值
+        numeric_returns = [x for x in df_results['年化報酬率 (%)'] if x != 'N/A']
+        numeric_volatility = [x for x in df_results['年化波動率 (%)'] if x != 'N/A']
+        
+        if numeric_returns:
+            print(f"平均年化報酬率: {np.mean(numeric_returns):.2f}%")
+        if numeric_volatility:
+            print(f"平均波動率: {np.mean(numeric_volatility):.2f}%")
+            
+        print(f"{'='*60}")
+
+        # 5. 視覺化
+        turnover_chart = plot_turnover_bar(df_results)
+        print("\nChart.js 條形圖配置（換手率）：")
+        print(turnover_chart)
+        # plot_price_trend({ticker: name for ticker, name in etf_list})
+        # plot_radar_chart(df_results)
+        # print("\n折線圖已儲存為 etf_price_trend.png")
+        # print("雷達圖已儲存為 etf_radar_chart.png")
+
+        print("\n📊 正在生成視覺化圖表...")
+        
+        # 修正字體問題的視覺化
+        plot_price_trend({ticker.strip(): name.strip() for ticker, name in etf_list})
+        plot_radar_chart(df_results)
+        plot_multi_metrics_comparison(df_results)  # 新增：多指標比較圖
+        plot_performance_comparison(df_results)
+        
+        print("✅ ETF vs 基準比較圖已儲存為 etf_vs_benchmark_trend.png")
+        print("✅ 雷達圖已儲存為 etf_radar_chart.png")
+        print("✅ 多指標圖表已儲存為 etf_multi_metrics_comparison.png")
+        print("✅ 績效比較圖已儲存為 etf_performance_comparison_TW.png 和 _US.png")
+        print("✅ 績效比較圖已儲存為 etf_performance_comparison.png")
+        
+        # 額外提供雙基準分析摘要
+        print(f"\n{'='*60}")
+        print("雙基準分析摘要:")
+        print("- 台股基準：用於計算追蹤誤差和相對表現")
+        print("- 美股基準：用於比較 00983A (ARK創新) 等跨市場ETF")
+        print("- 圖表中可清楚看出各ETF與兩市場的關聯性")
+        print(f"{'='*60}")
+    else:
+        print("沒有成功分析的ETF資料")

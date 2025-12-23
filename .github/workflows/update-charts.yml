@@ -1,0 +1,136 @@
+name: Weekly Update ETF Charts
+
+on:
+  schedule:
+    # 每週一凌晨 2 點 (UTC)
+    - cron: '0 2 * * 1'
+  
+  # 允許手動觸發
+  workflow_dispatch:
+
+jobs:
+  generate-and-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Active ETF Charts
+        run: |
+          echo "📊 生成主動式ETF圖表..."
+          python ETFEngine_main.py active_etf
+        continue-on-error: true
+
+      - name: Generate High Dividend ETF Charts
+        run: |
+          echo "💰 生成高股息ETF圖表..."
+          python ETFEngine_main.py high_dividend_etf
+        continue-on-error: true
+
+      - name: Generate Industry ETF Charts
+        run: |
+          echo "🏭 生成產業型ETF圖表..."
+          python ETFEngine_main.py industry_etf
+        continue-on-error: true
+
+      - name: Prepare outputs for deployment
+        run: |
+          echo "📦 準備輸出文件..."
+          mkdir -p charts_output
+          
+          # 複製所有生成的圖表
+          cp -r Output_*_ETF/*.png charts_output/ 2>/dev/null || true
+          cp -r Output_*_ETF/*.csv charts_output/ 2>/dev/null || true
+          
+          # 創建時間戳記
+          echo "Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > charts_output/UPDATE_TIME.txt
+          
+          echo "✅ 輸出文件已準備"
+          ls -lah charts_output/
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "ETF Bot"
+          git config --global user.email "etf-bot@github.com"
+          
+          # 添加更新的圖表
+          git add charts_output/ 2>/dev/null || true
+          
+          # 檢查是否有變化
+          if git diff --cached --quiet; then
+            echo "⏭️  沒有新的變化，跳過提交"
+          else
+            git commit -m "chore: weekly ETF charts update - $(date -u +'%Y-%m-%d')"
+            git push origin main
+            echo "✅ 圖表已推送到主分支"
+          fi
+        continue-on-error: true
+
+      - name: Trigger Render deployment
+        if: success()
+        run: |
+          echo "🚀 觸發 Render 部署..."
+          
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "⚠️  RENDER_DEPLOY_HOOK 未配置，跳過自動部署"
+            echo "請在 GitHub Secrets 中設置 RENDER_DEPLOY_HOOK"
+          else
+            curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" \
+              -H "Content-Type: application/json" \
+              -d '{"commit_message":"Weekly ETF charts update"}' \
+              --fail || echo "⚠️  Render 部署通知失敗（可能已手動觸發）"
+            echo "✅ Render 部署已觸發"
+          fi
+        continue-on-error: true
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "📋 ETF 圖表更新總結"
+          echo "=================="
+          echo "更新時間: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "生成的圖表："
+          find Output_*_ETF -name "*.png" 2>/dev/null | wc -l | xargs echo "  PNG 圖表數:"
+          find Output_*_ETF -name "*.csv" 2>/dev/null | wc -l | xargs echo "  CSV 文件數:"
+          echo ""
+          echo "輸出位置: charts_output/"
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: etf-charts-${{ github.run_id }}
+          path: |
+            charts_output/
+            Output_*_ETF/
+          retention-days: 30
+
+  notify:
+    needs: generate-and-update
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Create completion status
+        run: |
+          if [ "${{ needs.generate-and-update.result }}" = "success" ]; then
+            echo "✅ ETF 圖表更新成功完成"
+          else
+            echo "⚠️  ETF 圖表更新完成，但某些步驟可能失敗"
+          fi
