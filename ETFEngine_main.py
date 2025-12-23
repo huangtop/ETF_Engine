@@ -55,7 +55,11 @@ today = datetime.now()
 start_date_3y = (today - timedelta(days=3*365)).strftime('%Y-%m-%d')
 latest_date = today.strftime('%Y-%m-%d')
 
-
+# 對主動式 ETF 使用固定的起始日期（2025-07-22）
+# 因為主動式 ETF 很多最近才上市，數據不足
+if config_type == 'active_etf':
+    start_date_3y = '2025-07-22'
+    print(f"⚠️  主動式 ETF 使用固定起始日期: {start_date_3y}")
 def get_output_folder(config_type='active_etf'):
     """根據配置類型創建對應的輸出資料夾"""
     folder_mapping = {
@@ -79,35 +83,6 @@ def get_output_folder(config_type='active_etf'):
 
 # 初始化輸出資料夾
 output_folder = get_output_folder(config_type)
-
-
-def find_common_start_date(etf_list, initial_start_date, end_date):
-    """找出所有ETF的最晚開始日期作為統一比較期間"""
-    latest_start_date = None
-    
-    print("\n📅 檢查各ETF資料起始日期...")
-    for ticker, name in etf_list:
-        try:
-            df = yf.download(ticker, start=initial_start_date, end=end_date, progress=False)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                df.dropna(inplace=True)
-                if len(df) > 0:
-                    etf_start = df.index[0]
-                    print(f"   {ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
-                    
-                    if latest_start_date is None or etf_start > latest_start_date:
-                        latest_start_date = etf_start
-        except Exception as e:
-            print(f"   {ticker} 檢查失敗: {e}")
-    
-    if latest_start_date:
-        common_start = latest_start_date.strftime('%Y-%m-%d')
-        print(f"\n✅ 統一比較期間: {common_start} 至 {end_date}")
-        print(f"   (從最晚上市的ETF開始計算，確保公平比較)\n")
-        return common_start
-    else:
-        print(f"   使用預設起始日期: {initial_start_date}\n")
-        return initial_start_date
 
 
 def smart_label_with_ticker(name, ticker):
@@ -142,28 +117,49 @@ def smart_label_with_ticker(name, ticker):
             return f"{ticker_short}\n{short_name}"
         return f"{ticker_short}\n{name}"
 
-def find_common_start_date(etf_list, initial_start_date, end_date):
-    """找出所有ETF的最晚開始日期作為統一比較期間"""
+def find_common_start_date(etf_list, initial_start_date, end_date, use_fixed_start=False):
+    """找出所有ETF的最晚開始日期作為統一比較期間
+    
+    Args:
+        etf_list: ETF 列表
+        initial_start_date: 初始起始日期
+        end_date: 結束日期
+        use_fixed_start: 是否使用固定的起始日期（跳過太新的ETF）
+    """
     latest_start_date = None
     
-    print("檢查各ETF資料起始日期...")
-    for ticker, name in etf_list:
+    print("\n📅 檢查各ETF資料起始日期...")
+    for item in etf_list:
+        ticker = item[0]
+        name = item[1]
+        # 忽略可選的第3個元素（分類信息）
         try:
-            df = yf.download(ticker, start=initial_start_date, end=end_date)
-            if not df.empty:
+            df = yf.download(ticker, start=initial_start_date, end=end_date, progress=False)
+            if isinstance(df, pd.DataFrame) and not df.empty:
                 df.dropna(inplace=True)
                 if len(df) > 0:
                     etf_start = df.index[0]
-                    print(f"{ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
+                    print(f"  {ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
                     
-                    if latest_start_date is None or etf_start > latest_start_date:
-                        latest_start_date = etf_start
+                    # 如果使用固定起始日期，只記錄不早於起始日期的 ETF
+                    if use_fixed_start:
+                        if etf_start <= pd.to_datetime(initial_start_date):
+                            if latest_start_date is None or etf_start > latest_start_date:
+                                latest_start_date = etf_start
+                    else:
+                        if latest_start_date is None or etf_start > latest_start_date:
+                            latest_start_date = etf_start
         except Exception as e:
-            print(f"{ticker} 檢查失敗: {e}")
+            print(f"  {ticker} 檢查失敗: {type(e).__name__}")
     
-    if latest_start_date:
+    if use_fixed_start:
+        # 對於主動式 ETF，強制使用指定的起始日期
+        common_start = initial_start_date
+        print(f"\n📊 統一比較期間: {common_start} 至 {end_date}")
+        return common_start
+    elif latest_start_date:
         common_start = latest_start_date.strftime('%Y-%m-%d')
-        print(f"\n統一比較期間: {common_start} 至 {end_date}")
+        print(f"\n📊 統一比較期間: {common_start} 至 {end_date}")
         return common_start
     else:
         return initial_start_date
@@ -386,26 +382,8 @@ dividend_yield_dict = {
     '00757.TW': 0.4   # FANG+，成長股，股息極低
 }
 
-# 暫時手動設定換手率
-turnover_dict = {
-    # 主動型ETF
-    '00980A.TW': 80,
-    '00981A.TW': 75,
-    '00982A.TW': 70,
-    '00983A.TW': 25,    # ARK創新，主動但相對較低
-    '00984A.TW': 85,
-    '00985A.TW': 78,
-    '00980D.TW': 30,    # 債券型，換手率較低
-    # 台股被動型ETF
-    '0050.TW': 5,
-    '006208.TW': 6,
-    '0056.TW': 8,       # 高股息，會調整成分股
-    '00878.TW': 12,     # ESG篩選，稍高換手率
-    # 美股被動型ETF
-    '00646.TW': 8,   
-    '00662.TW': 12,  
-    '00757.TW': 15
-}
+# 從配置中獲取換手率（如果配置中有 turnover_ratio 字段）
+turnover_dict = config.get('turnover_ratio', {})
 
 
 def calculate_alpha_beta(etf_returns, benchmark_returns, rf_rate):
@@ -529,7 +507,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         
         return {
             '證券代碼': clean_ticker,
-            '名稱': dict(etf_list)[ticker].strip(),  # 移除多餘空格
+            '名稱': next((item[1] for item in etf_list if item[0] == ticker), '未知').strip(),  # 從 etf_list 中查找名稱
             '資料期間 (年)': round(data_years, 2),
             '年化報酬率 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
@@ -632,7 +610,7 @@ def plot_radar_chart(df_results):
     angles = [n / float(N) * 2 * pi for n in range(N)]
     angles += angles[:1]
     
-    # 分類ETF資料
+    # 分類ETF資料（從 JSON 配置讀取）
     us_etfs = []
     tw_stock_etfs = []
     tw_dividend_etfs = []
@@ -640,12 +618,14 @@ def plot_radar_chart(df_results):
     for _, row in df_results.iterrows():
         ticker = row['證券代碼'].strip()
         name = row['名稱'].strip()
+        etf_type = config.get('etf_type', {}).get(ticker)
         
-        if ticker in ['00646.TW', '00662.TW', '00757.TW', '00983A.TW']:
+        if etf_type == 'us':
             us_etfs.append(row)
-        elif any(keyword in name for keyword in ['高股息', '高息', '永續']):
+        elif etf_type == 'dividend':
             tw_dividend_etfs.append(row)
         else:
+            # 預設為 taiwan_stock
             tw_stock_etfs.append(row)
     
     # 收集數據範圍（基於全部資料）
@@ -1419,7 +1399,8 @@ def plot_performance_comparison(df_results):
         ret = float(row['年化報酬率 (%)'])
         
         # 分類邏輯：美股 vs 台股
-        if '美股' in name or 'US' in name or any(code in ticker for code in ['00646', '00662', '00757', '00983A']):
+        # 美股相關 ETF：00646、00662、00757、00983A（ARK創新）、00988A（統一全球創新）、00989A（摩根美國科技）
+        if '美股' in name or 'US' in name or any(code in ticker for code in ['00646', '00662', '00757', '00983A', '00988A', '00989A']):
             us_etfs.append((name, ret, ticker))
             print(f"  ✅ 美股: {ticker:12} - {ret:7.2f}%")
         else:
@@ -1669,7 +1650,9 @@ if __name__ == '__main__':
     plt = setup_matplotlib_backend()
 
     # 1. 找出統一的比較期間
-    common_start_date = find_common_start_date(etf_list, start_date_3y, latest_date)
+    # 主動式 ETF 使用固定的 7/22 起始日期，其他配置使用最晚上市日期
+    use_fixed_start = (config_type == 'active_etf')
+    common_start_date = find_common_start_date(etf_list, start_date_3y, latest_date, use_fixed_start=use_fixed_start)
     
     # 2. 下載0050作為基準（用於計算追蹤誤差）
     print(f"\n下載基準指數 0050...")
@@ -1703,7 +1686,9 @@ if __name__ == '__main__':
     # 3. 分析所有ETF
     print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
     results = []
-    for ticker, name in etf_list:
+    for item in etf_list:
+        ticker = item[0]
+        # 忽略可選的第3個元素（分類信息）
         data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate)
         if data:
             results.append(data)
@@ -1786,7 +1771,7 @@ if __name__ == '__main__':
         print("\n📊 正在生成視覺化圖表...")
         
         # 修正字體問題的視覺化
-        plot_price_trend({ticker.strip(): name.strip() for ticker, name in etf_list})
+        plot_price_trend({item[0].strip(): item[1].strip() for item in etf_list})
         plot_radar_chart(df_results)
         plot_multi_metrics_comparison(df_results)  # 新增：多指標比較圖
         plot_performance_comparison(df_results)

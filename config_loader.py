@@ -136,8 +136,9 @@ class ETFConfigLoader:
         else:
             # 验证 ETF 列表格式
             for i, etf in enumerate(config['etf_list']):
-                if not isinstance(etf, (list, tuple)) or len(etf) != 2:
-                    errors.append(f"ETF 列表项 {i} 格式错误，应为 [ticker, name]")
+                # 支持 [ticker, name] 或 [ticker, name, type] 格式
+                if not isinstance(etf, (list, tuple)) or len(etf) < 2 or len(etf) > 3:
+                    errors.append(f"ETF 列表项 {i} 格式错误，应为 [ticker, name] 或 [ticker, name, type]")
         
         if 'expense_ratio' not in config:
             errors.append("缺少 'expense_ratio' 字段")
