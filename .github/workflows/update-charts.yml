@@ -60,11 +60,11 @@ jobs:
           echo "🔧 Writing matplotlibrc to force CJK fonts"
           export MPLCONFIGDIR=$(pwd)/.mplconfig
           mkdir -p "$MPLCONFIGDIR"
-          cat > "$MPLCONFIGDIR/matplotlibrc" <<'MPL'
-font.family : sans-serif
-font.sans-serif : Noto Sans CJK TC, Noto Sans CJK SC, Noto Sans CJK JP, WenQuanYi Zen Hei, DejaVu Sans
-axes.unicode_minus : False
-MPL
+          printf "%s\n" \
+            "font.family : sans-serif" \
+            "font.sans-serif : Noto Sans CJK TC, Noto Sans CJK SC, Noto Sans CJK JP, WenQuanYi Zen Hei, DejaVu Sans" \
+            "axes.unicode_minus : False" \
+            > "$MPLCONFIGDIR/matplotlibrc"
           echo "matplotlibrc written to $MPLCONFIGDIR/matplotlibrc"
           echo "Contents:" && sed -n '1,120p' "$MPLCONFIGDIR/matplotlibrc"
 
