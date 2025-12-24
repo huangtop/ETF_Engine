@@ -55,6 +55,19 @@ jobs:
           sudo fc-cache -fv || true
           python -c "import matplotlib,shutil,os; d=matplotlib.get_cachedir(); print('matplotlib cache dir:', d); shutil.rmtree(d, ignore_errors=True); print('matplotlib cache removed')"
 
+      - name: Force matplotlib to use CJK fonts (write matplotlibrc)
+        run: |
+          echo "🔧 Writing matplotlibrc to force CJK fonts"
+          export MPLCONFIGDIR=$(pwd)/.mplconfig
+          mkdir -p "$MPLCONFIGDIR"
+          cat > "$MPLCONFIGDIR/matplotlibrc" <<'MPL'
+font.family : sans-serif
+font.sans-serif : Noto Sans CJK TC, Noto Sans CJK SC, Noto Sans CJK JP, WenQuanYi Zen Hei, DejaVu Sans
+axes.unicode_minus : False
+MPL
+          echo "matplotlibrc written to $MPLCONFIGDIR/matplotlibrc"
+          echo "Contents:" && sed -n '1,120p' "$MPLCONFIGDIR/matplotlibrc"
+
       - name: Generate Active ETF Charts
         run: |
           echo "📊 生成主動式ETF圖表..."
