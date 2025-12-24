@@ -47,6 +47,16 @@ config = load_etf_config(config_type)
 etf_list = config['etf_list']
 expense_ratio_dict = config['expense_ratio']
 
+# 根據配置類型設置文件名前綴，避免不同ETF類型覆蓋
+if config_type == 'active_etf':
+    etf_type_prefix = 'Active_'
+elif config_type == 'high_dividend_etf':
+    etf_type_prefix = 'HighDividend_'
+elif config_type == 'industry_etf':
+    etf_type_prefix = 'Industry_'
+else:
+    etf_type_prefix = ''
+
 # 風險無風報酬率
 risk_free_rate = 0.015
 
@@ -615,8 +625,13 @@ def plot_turnover_bar(df_results):
         }
     }
 
-def plot_radar_chart(df_results):
-    """繪製多指標雷達圖（分類拆分，使用不同標記）"""
+def plot_radar_chart(df_results, etf_type_prefix=""):
+    """繪製多指標雷達圖（分類拆分，使用不同標記）
+    
+    Args:
+        df_results: ETF 分析結果 DataFrame
+        etf_type_prefix: ETF 類型前綴（如 "Active_", "HighDividend_", "Industry_"）
+    """
     from math import pi
     import os
     
@@ -678,7 +693,7 @@ def plot_radar_chart(df_results):
             normalized = 100 - normalized
         return max(0, min(100, normalized))
     
-    def plot_single_radar(etf_data, title, filename, colors, markers, linestyles):
+    def plot_single_radar(etf_data, title, filename, colors, markers, linestyles, etf_type_prefix=""):
         """繪製單一雷達圖"""
         fig, ax = plt.subplots(figsize=(12, 12), subplot_kw=dict(polar=True))
         
@@ -749,7 +764,7 @@ def plot_radar_chart(df_results):
         
         # 儲存圖片到輸出資料夾
         try:
-            output_path = os.path.join(output_folder, filename)
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}{filename}')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             print(f"✅ {title}已儲存為: {output_path}")
         except Exception as e:
@@ -771,7 +786,7 @@ def plot_radar_chart(df_results):
         plot_single_radar(us_etfs, 
                          '美股相關ETF雷達圖\n△ 三角形標記', 
                          'radar_us_etfs.png',
-                         us_colors, us_markers, us_linestyles)
+                         us_colors, us_markers, us_linestyles, etf_type_prefix)
     
     # 2. 台股股票型ETF雷達圖
     if tw_stock_etfs:
@@ -782,7 +797,7 @@ def plot_radar_chart(df_results):
         plot_single_radar(tw_stock_etfs, 
                          '台股股票型ETF雷達圖\n● 圓形標記', 
                          'radar_tw_stock.png',
-                         stock_colors, stock_markers, stock_linestyles)
+                         stock_colors, stock_markers, stock_linestyles, etf_type_prefix)
     
     # 3. 台股高股息ETF雷達圖
     if tw_dividend_etfs:
@@ -793,7 +808,7 @@ def plot_radar_chart(df_results):
         plot_single_radar(tw_dividend_etfs, 
                          '台股高股息ETF雷達圖\n■ 方形標記', 
                          'radar_tw_dividend.png',
-                         div_colors, div_markers, div_linestyles)
+                         div_colors, div_markers, div_linestyles, etf_type_prefix)
     
     # 4. 總覽雷達圖（所有ETF）
     fig, ax = plt.subplots(figsize=(16, 16), subplot_kw=dict(polar=True))
@@ -969,12 +984,12 @@ def plot_radar_chart(df_results):
     
     # 儲存總覽圖到輸出資料夾
     try:
-        output_path = os.path.join(output_folder, 'radar_overview.png')
+        output_path = os.path.join(output_folder, f'{etf_type_prefix}radar_overview.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"\n✅ 總覽雷達圖已儲存為: {output_path}")
     except Exception as e:
         try:
-            output_path = os.path.join(output_folder, 'radar_overview.png')
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}radar_overview.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             print(f"✅ 總覽雷達圖已儲存為: {output_path}")
         except:
@@ -989,8 +1004,16 @@ def plot_radar_chart(df_results):
     print(f"  ■ 台股高股息ETF: {len(tw_dividend_etfs)} 支")
     print(f"  總計: {len(us_etfs) + len(tw_stock_etfs) + len(tw_dividend_etfs)} 支")
 
-def plot_price_trend(etf_list, config, common_start_date, latest_date):
-    """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）"""
+def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix=""):
+    """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）
+    
+    Args:
+        etf_list: ETF 列表
+        config: ETF 配置
+        common_start_date: 統一的起始日期
+        latest_date: 結束日期
+        etf_type_prefix: ETF 類型前綴（如 "Active_", "HighDividend_", "Industry_"）
+    """
     plt = setup_matplotlib_backend()
     setup_chinese_font()
     
@@ -1113,12 +1136,12 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         
         # 儲存總覽圖到輸出資料夾
         try:
-            output_path = os.path.join(output_folder, 'trend_overview.png')
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}trend_overview.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             print(f"✅ 總覽趨勢圖已儲存為: {output_path}")
         except Exception as e:
             try:
-                output_path = os.path.join(output_folder, 'trend_overview.png')
+                output_path = os.path.join(output_folder, f'{etf_type_prefix}trend_overview.png')
                 plt.savefig(output_path, dpi=300, bbox_inches='tight')
                 print(f"✅ 總覽趨勢圖已儲存為: {output_path}")
             except:
@@ -1127,7 +1150,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         plt.close()
     
     # 2. 子圖函數：以基準指數正規化
-    def plot_category_trend(etf_group, benchmark_ticker, benchmark_name, category_name, filename, benchmark_color):
+    def plot_category_trend(etf_group, benchmark_ticker, benchmark_name, category_name, filename, benchmark_color, etf_type_prefix=""):
         """繪製分類趨勢圖，以基準指數為標準正規化"""
         
         if not etf_group:
@@ -1257,12 +1280,12 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         
         # 儲存子圖到輸出資料夾
         try:
-            output_path = os.path.join(output_folder, filename)
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}{filename}')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             print(f"✅ {category_name}趨勢圖已儲存為: {output_path}")
         except Exception as e:
             try:
-                output_path = os.path.join(output_folder, filename)
+                output_path = os.path.join(output_folder, f'{etf_type_prefix}{filename}')
                 plt.savefig(output_path, dpi=300, bbox_inches='tight')
                 print(f"✅ {category_name}趨勢圖已儲存為: {output_path}")
             except:
@@ -1283,7 +1306,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         'S&P500', 
         '美股相關ETF', 
         'trend_us_etfs.png',
-        '#0066CC'
+        '#0066CC',
+        etf_type_prefix
     )
     
     # 台股高股息ETF vs 元大高股息(0056)
@@ -1293,7 +1317,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         '元大高股息', 
         '台股高股息ETF', 
         'trend_tw_dividend.png',
-        '#FF6600'
+        '#FF6600',
+        etf_type_prefix
     )
     
     # 台股股票型ETF vs 台灣50(0050)
@@ -1303,14 +1328,15 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
         '台灣50', 
         '台股股票型ETF', 
         'trend_tw_stock.png',
-        '#CC0000'
+        '#CC0000',
+        etf_type_prefix
     )
     
     print(f"\n📊 趨勢圖繪製完成！")
-    print(f"✅ 總覽圖: trend_overview.png")
-    print(f"✅ 美股相關: trend_us_etfs.png")
-    print(f"✅ 台股高股息: trend_tw_dividend.png") 
-    print(f"✅ 台股股票型: trend_tw_stock.png")
+    print(f"✅ 總覽圖: {etf_type_prefix}trend_overview.png")
+    print(f"✅ 美股相關: {etf_type_prefix}trend_us_etfs.png")
+    print(f"✅ 台股高股息: {etf_type_prefix}trend_tw_dividend.png") 
+    print(f"✅ 台股股票型: {etf_type_prefix}trend_tw_stock.png")
     
     # 輸出分析摘要
     print(f"\n📊 趨勢圖分析方式:")
@@ -1320,7 +1346,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date):
     print(f"  📏 實線/虛線: 區分主動型/被動型ETF")
 
 
-def plot_multi_metrics_comparison(df_results):
+def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
     """繪製多指標柱狀圖：年化報酬率、Alpha、Beta、夏普比率、MDD、標準差、費用率、追蹤誤差"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
@@ -1415,7 +1441,7 @@ def plot_multi_metrics_comparison(df_results):
     
     # 保存圖表
     try:
-        output_path = os.path.join(output_folder, 'etf_multi_metrics_comparison.png')
+        output_path = os.path.join(output_folder, f'{etf_type_prefix}etf_multi_metrics_comparison.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"\n✅ 多指標圖表已儲存: {output_path}")
     except Exception as e:
@@ -1424,7 +1450,7 @@ def plot_multi_metrics_comparison(df_results):
     plt.close()
 
 
-def plot_performance_comparison(df_results):
+def plot_performance_comparison(df_results, etf_type_prefix=""):
     """繪製績效比較柱狀圖 - 自動根據 ETF 類型生成 _TW 或 _US 版本"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
@@ -1580,9 +1606,9 @@ def plot_performance_comparison(df_results):
         
         # 保存
         try:
-            output_path = os.path.join(output_folder, 'etf_performance_comparison_TW.png')
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}etf_performance_comparison_TW.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            print(f"  ✅ 台股 ETF 柱狀圖已儲存: etf_performance_comparison_TW.png ({current_time})")
+            print(f"  ✅ 台股 ETF 柱狀圖已儲存: {etf_type_prefix}etf_performance_comparison_TW.png ({current_time})")
         except Exception as e:
             print(f"  ❌ 保存失敗: {e}")
         
@@ -1678,9 +1704,9 @@ def plot_performance_comparison(df_results):
         
         # 保存
         try:
-            output_path = os.path.join(output_folder, 'etf_performance_comparison_US.png')
+            output_path = os.path.join(output_folder, f'{etf_type_prefix}etf_performance_comparison_US.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
-            print(f"  ✅ 美股 ETF 柱狀圖已儲存: etf_performance_comparison_US.png ({current_time})")
+            print(f"  ✅ 美股 ETF 柱狀圖已儲存: {etf_type_prefix}etf_performance_comparison_US.png ({current_time})")
         except Exception as e:
             print(f"  ❌ 保存失敗: {e}")
         
@@ -1787,7 +1813,7 @@ if __name__ == '__main__':
         print('-' * 180)
 
         # 儲存結果到輸出資料夾
-        csv_path = os.path.join(output_folder, 'etf_comparison_unified.csv')
+        csv_path = os.path.join(output_folder, f'{etf_type_prefix}etf_comparison_unified.csv')
         df_results.to_csv(csv_path, index=False, encoding='utf-8-sig')
         print(f"\n結果已儲存至 {csv_path}")
         
@@ -1820,16 +1846,16 @@ if __name__ == '__main__':
         print("\n📊 正在生成視覺化圖表...")
         
         # 修正字體問題的視覺化
-        plot_price_trend(etf_list, config, common_start_date, latest_date)
-        plot_radar_chart(df_results)
-        plot_multi_metrics_comparison(df_results)  # 新增：多指標比較圖
-        plot_performance_comparison(df_results)
+        plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix)
+        plot_radar_chart(df_results, etf_type_prefix)
+        plot_multi_metrics_comparison(df_results, etf_type_prefix)  # 新增：多指標比較圖
+        plot_performance_comparison(df_results, etf_type_prefix)
         
         print("✅ ETF vs 基準比較圖已儲存為 etf_vs_benchmark_trend.png")
         print("✅ 雷達圖已儲存為 etf_radar_chart.png")
-        print("✅ 多指標圖表已儲存為 etf_multi_metrics_comparison.png")
-        print("✅ 績效比較圖已儲存為 etf_performance_comparison_TW.png 和 _US.png")
-        print("✅ 績效比較圖已儲存為 etf_performance_comparison.png")
+        print(f"✅ 多指標圖表已儲存為 {etf_type_prefix}etf_multi_metrics_comparison.png")
+        print(f"✅ 績效比較圖已儲存為 {etf_type_prefix}etf_performance_comparison_TW.png 和 {etf_type_prefix}etf_performance_comparison_US.png")
+        print(f"✅ 績效比較圖已儲存為 {etf_type_prefix}etf_performance_comparison.png")
         
         # 額外提供雙基準分析摘要
         print(f"\n{'='*60}")
