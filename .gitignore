@@ -24,7 +24,7 @@ Output_Dividend_ETF/
 Output_US_ETF/
 Output_Industry_ETF/
 Output_Default/
-charts_output/
+# charts_output/  # 移除此行，让工作流可以提交生成的图表
 
 # 测试文件（开头为test_的.py文件）
 test_*.py
