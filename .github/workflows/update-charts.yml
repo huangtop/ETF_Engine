@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "🔁 Rebuilding font cache and matplotlib font manager"
           sudo fc-cache -fv || true
-          python -c "import matplotlib.font_manager as fm; fm._rebuild(); print('matplotlib font cache rebuilt')"
+          python -c "import matplotlib,shutil,os; d=matplotlib.get_cachedir(); print('matplotlib cache dir:', d); shutil.rmtree(d, ignore_errors=True); print('matplotlib cache removed')"
 
       - name: Generate Active ETF Charts
         run: |
