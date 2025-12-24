@@ -90,9 +90,41 @@ jobs:
           echo "📦 準備輸出文件..."
           mkdir -p charts_output
           
-          # 複製所有生成的圖表
-          cp -r Output_*_ETF/*.png charts_output/ 2>/dev/null || true
-          cp -r Output_*_ETF/*.csv charts_output/ 2>/dev/null || true
+          # 複製主動式ETF圖表（添加前綴）
+          if [ -d "Output_Active_ETF" ]; then
+            echo "📋 複製主動式ETF圖表..."
+            for file in Output_Active_ETF/*.png Output_Active_ETF/*.csv; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                cp "$file" "charts_output/Active_${filename}"
+                echo "  ✅ Active_${filename}"
+              fi
+            done
+          fi
+          
+          # 複製高股息ETF圖表（添加前綴）
+          if [ -d "Output_HighDividend_ETF" ]; then
+            echo "📋 複製高股息ETF圖表..."
+            for file in Output_HighDividend_ETF/*.png Output_HighDividend_ETF/*.csv; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                cp "$file" "charts_output/HighDividend_${filename}"
+                echo "  ✅ HighDividend_${filename}"
+              fi
+            done
+          fi
+          
+          # 複製產業型ETF圖表（添加前綴）
+          if [ -d "Output_Industry_ETF" ]; then
+            echo "📋 複製產業型ETF圖表..."
+            for file in Output_Industry_ETF/*.png Output_Industry_ETF/*.csv; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                cp "$file" "charts_output/Industry_${filename}"
+                echo "  ✅ Industry_${filename}"
+              fi
+            done
+          fi
           
           # 創建時間戳記
           echo "Last updated: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" > charts_output/UPDATE_TIME.txt
