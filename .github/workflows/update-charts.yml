@@ -58,7 +58,9 @@ jobs:
       - name: Force matplotlib to use CJK fonts (write matplotlibrc)
         run: |
           echo "🔧 Writing matplotlibrc to force CJK fonts"
-          export MPLCONFIGDIR=$(pwd)/.mplconfig
+          MPLCONFIGDIR=$(pwd)/.mplconfig
+          # export to GITHUB_ENV so following steps inherit the variable
+          echo "MPLCONFIGDIR=$MPLCONFIGDIR" >> $GITHUB_ENV
           mkdir -p "$MPLCONFIGDIR"
           printf "%s\n" \
             "font.family : sans-serif" \
