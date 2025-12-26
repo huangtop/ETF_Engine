@@ -949,39 +949,18 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     # 計算每列顯示的項目數
     n_items = len(labels)
-    n_cols = 2
+    # 調整為多列顯示，避免超出圖表
+    n_cols = 3  # 改為3列
     n_rows = (n_items + n_cols - 1) // n_cols
     
-    # 創建兩個圖例
-    first_half = handles[:n_rows], labels[:n_rows]
-    second_half = handles[n_rows:], labels[n_rows:]
+    # 合併所有 ETF 清單，不分 (1) 和 (2)
+    legend1 = plt.legend(handles, labels, 
+                        bbox_to_anchor=(1.05, 1.0), loc='upper left', 
+                        fontsize=14, frameon=True, fancybox=True, shadow=True,
+                        title='ETF 清單', title_fontsize=16, ncol=3)
     
-    legend1 = plt.legend(first_half[0], first_half[1], 
-                        bbox_to_anchor=(1.15, 1.0), loc='upper left', 
-                        fontsize=16, frameon=True, fancybox=True, shadow=True,
-                        title='ETF 清單 (1)', title_fontsize=16)
-    
-    if second_half[0]:
-        legend2 = plt.legend(second_half[0], second_half[1], 
-                            bbox_to_anchor=(1.15, 0.5), loc='upper left', 
-                            fontsize=16, frameon=True, fancybox=True, shadow=True,
-                            title='ETF 清單 (2)', title_fontsize=16)
-        plt.gca().add_artist(legend1)
-    
-    # 添加標記說明
-    marker_legend_elements = [
-        plt.Line2D([0], [0], color='black', linewidth=0, marker='^', markersize=10, label='美股相關'),
-        plt.Line2D([0], [0], color='black', linewidth=0, marker='o', markersize=10, label='台股股票型'),
-        plt.Line2D([0], [0], color='black', linewidth=0, marker='s', markersize=10, label='台股高股息型')
-    ]
-    
-    legend3 = plt.legend(handles=marker_legend_elements, 
-                        bbox_to_anchor=(1.15, 0.2), loc='upper left',
-                        fontsize=16, frameon=True, fancybox=True, shadow=True,
-                        title='標記說明', title_fontsize=16)
+    # 移除標記說明，直接保存圖例
     plt.gca().add_artist(legend1)
-    if 'legend2' in locals():
-        plt.gca().add_artist(legend2)
     
     # 添加各指標冠軍信息
     print(f"\n🏆 各指標冠軍:")
@@ -1022,10 +1001,10 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     for info in champion_info:
         print(info)
     
-    # 在圖表上添加冠軍信息文本
+    # 在圖表上添加冠軍信息文本（放大一倍，靠左對齐）
     champion_text = '\n'.join([info.replace('  🏆 ', '') for info in champion_info])
-    fig.text(0.5, -0.05, f'各指標冠軍:\n{champion_text}', 
-             ha='center', fontsize=FONT_SIZE_CONFIG['label_medium'], 
+    fig.text(0.02, -0.05, f'各指標冠軍:\n{champion_text}', 
+             ha='left', fontsize=FONT_SIZE_CONFIG['label_medium'] * 2, 
              bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
     
     plt.tight_layout()
