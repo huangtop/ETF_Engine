@@ -778,33 +778,60 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         
         plt.close()
     
-    # 1. 美股相關ETF雷達圖
+    # 1. 美股相關ETF雷達圖 - 擴展顏色和線條以支援多達30支ETF
     if us_etfs:
-        us_colors = ['#4BC0C0', '#9966FF', '#FF5733', '#FF9F40']
-        us_markers = ['^', '^', '^', '^']
-        us_linestyles = ['-', '--', '-.', ':']
+        us_colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DFE6E9', '#A29BFE', '#6C5CE7', '#74B9FF', '#81ECEC',
+            '#55EFC4', '#FD79A8', '#FDCB6E', '#6C7A89', '#00B894',
+            '#FF7675', '#74B9FF', '#A29BFE', '#00CEC9', '#FF6348',
+            '#F39C12', '#E74C3C', '#3498DB', '#2ECC71', '#9B59B6',
+            '#1ABC9C', '#34495E', '#C0392B', '#16A085', '#D35400'
+        ]
+        us_linestyles = ['-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--',
+                         '-.', ':', '-', '--', '-.', ':', '-', '--', '-.', ':',
+                         '-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--']
+        us_markers = ['^'] * len(us_colors)
         
         plot_single_radar(us_etfs, 
                          '美股相關ETF雷達圖\n△ 三角形標記', 
                          'radar_us_etfs.png',
                          us_colors, us_markers, us_linestyles, etf_type_prefix)
     
-    # 2. 台股股票型ETF雷達圖
+    # 2. 台股股票型ETF雷達圖 - 擴展顏色和線條以支援多達30支ETF
     if tw_stock_etfs:
-        stock_colors = ['#FF6384', '#36A2EB', '#FFCE56', '#7BC225', '#DC143C', '#32CD32']
-        stock_markers = ['o', 'o', 'o', 'o', 'o', 'o']
-        stock_linestyles = ['-', '--', '-.', ':', '-', '--']
+        stock_colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DFE6E9', '#A29BFE', '#6C5CE7', '#74B9FF', '#81ECEC',
+            '#55EFC4', '#FD79A8', '#FDCB6E', '#6C7A89', '#00B894',
+            '#FF7675', '#74B9FF', '#A29BFE', '#00CEC9', '#FF6348',
+            '#F39C12', '#E74C3C', '#3498DB', '#2ECC71', '#9B59B6',
+            '#1ABC9C', '#34495E', '#C0392B', '#16A085', '#D35400'
+        ]
+        stock_linestyles = ['-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--',
+                            '-.', ':', '-', '--', '-.', ':', '-', '--', '-.', ':',
+                            '-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--']
+        stock_markers = ['o'] * len(stock_colors)
         
         plot_single_radar(tw_stock_etfs, 
                          '台股股票型ETF雷達圖\n● 圓形標記', 
                          'radar_tw_stock.png',
                          stock_colors, stock_markers, stock_linestyles, etf_type_prefix)
     
-    # 3. 台股高股息ETF雷達圖
+    # 3. 台股高股息ETF雷達圖 - 擴展顏色和線條以支援多達30支ETF
     if tw_dividend_etfs:
-        div_colors = ['#FF9F40', '#C70039', '#900C3F']
-        div_markers = ['s', 's', 's']
-        div_linestyles = ['-', '--', '-.']
+        div_colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+            '#DFE6E9', '#A29BFE', '#6C5CE7', '#74B9FF', '#81ECEC',
+            '#55EFC4', '#FD79A8', '#FDCB6E', '#6C7A89', '#00B894',
+            '#FF7675', '#74B9FF', '#A29BFE', '#00CEC9', '#FF6348',
+            '#F39C12', '#E74C3C', '#3498DB', '#2ECC71', '#9B59B6',
+            '#1ABC9C', '#34495E', '#C0392B', '#16A085', '#D35400'
+        ]
+        div_linestyles = ['-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--',
+                          '-.', ':', '-', '--', '-.', ':', '-', '--', '-.', ':',
+                          '-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--']
+        div_markers = ['s'] * len(div_colors)
         
         plot_single_radar(tw_dividend_etfs, 
                          '台股高股息ETF雷達圖\n■ 方形標記', 
@@ -821,10 +848,29 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         'dividend': 's' # 方形 - 台股高股息型
     }
     
+    # 擴展顏色映射以支援更多ETF
+    extended_colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+        '#DFE6E9', '#A29BFE', '#6C5CE7', '#74B9FF', '#81ECEC',
+        '#55EFC4', '#FD79A8', '#FDCB6E', '#6C7A89', '#00B894',
+        '#FF7675', '#74B9FF', '#A29BFE', '#00CEC9', '#FF6348',
+        '#F39C12', '#E74C3C', '#3498DB', '#2ECC71', '#9B59B6',
+        '#1ABC9C', '#34495E', '#C0392B', '#16A085', '#D35400'
+    ]
+    extended_linestyles = ['-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--',
+                          '-.', ':', '-', '--', '-.', ':', '-', '--', '-.', ':',
+                          '-', '--', '-.', ':', '-', '--', '-.', ':', '-', '--']
+    
     color_map = {
-        'us': ['#4BC0C0', '#9966FF', '#FF5733', '#FF9F40'],
-        'stock': ['#FF6384', '#36A2EB', '#FFCE56', '#7BC225', '#DC143C', '#32CD32'],
-        'dividend': ['#FF9F40', '#C70039', '#900C3F']
+        'us': extended_colors,
+        'stock': extended_colors,
+        'dividend': extended_colors
+    }
+    
+    linestyle_map = {
+        'us': extended_linestyles,
+        'stock': extended_linestyles,
+        'dividend': extended_linestyles
     }
     
     all_etf_data = []
@@ -859,15 +905,10 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         
         values += values[:1]  # 閉合圖形
         
-        # 取得顏色和標記
+        # 取得顏色、標記和線型
         color = color_map[etf_type][type_index % len(color_map[etf_type])]
         marker = marker_map[etf_type]
-        
-        # 根據主動/被動決定線型
-        if '主動' in name:
-            linestyle = '-'
-        else:
-            linestyle = '--'
+        linestyle = linestyle_map[etf_type][type_index % len(linestyle_map[etf_type])]
         
         # 繪製線條
         ax.plot(angles, values, linewidth=2.5, linestyle=linestyle, 
