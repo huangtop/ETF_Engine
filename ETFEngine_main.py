@@ -930,7 +930,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     legend3 = plt.legend(handles=marker_legend_elements, 
                         bbox_to_anchor=(1.15, 0.2), loc='upper left',
                         fontsize=33, frameon=True, fancybox=True, shadow=True,
-                        title='標記說明', title_fontsize=48)
+                        title='標記說明', title_fontsize=12)
     plt.gca().add_artist(legend1)
     if 'legend2' in locals():
         plt.gca().add_artist(legend2)
