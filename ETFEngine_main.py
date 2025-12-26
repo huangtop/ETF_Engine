@@ -910,14 +910,14 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     legend1 = plt.legend(first_half[0], first_half[1], 
                         bbox_to_anchor=(1.15, 1.0), loc='upper left', 
-                        fontsize=9, frameon=True, fancybox=True, shadow=True,
-                        title='ETF 清單 (1)', title_fontsize=10)
+                        fontsize=27, frameon=True, fancybox=True, shadow=True,
+                        title='ETF 清單 (1)', title_fontsize=30)
     
     if second_half[0]:
         legend2 = plt.legend(second_half[0], second_half[1], 
                             bbox_to_anchor=(1.15, 0.5), loc='upper left', 
-                            fontsize=9, frameon=True, fancybox=True, shadow=True,
-                            title='ETF 清單 (2)', title_fontsize=10)
+                            fontsize=27, frameon=True, fancybox=True, shadow=True,
+                            title='ETF 清單 (2)', title_fontsize=30)
         plt.gca().add_artist(legend1)
     
     # 添加標記說明
@@ -929,8 +929,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     legend3 = plt.legend(handles=marker_legend_elements, 
                         bbox_to_anchor=(1.15, 0.2), loc='upper left',
-                        fontsize=11, frameon=True, fancybox=True, shadow=True,
-                        title='標記說明', title_fontsize=16)
+                        fontsize=33, frameon=True, fancybox=True, shadow=True,
+                        title='標記說明', title_fontsize=48)
     plt.gca().add_artist(legend1)
     if 'legend2' in locals():
         plt.gca().add_artist(legend2)
@@ -1405,7 +1405,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
                        fontsize=9, fontweight='bold')
         
         # 設置標題和標籤
-        ax.set_title(metric_name, fontsize=FONT_SIZE_CONFIG['title_small'], fontweight='bold', pad=10)
+        ax.set_title(metric_name, fontsize=FONT_SIZE_CONFIG['title_small']-4, fontweight='bold', pad=15)
         ax.set_ylabel('數值', fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         ax.set_xticks(x_pos)
         
@@ -1437,7 +1437,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
              ha='center', fontsize=FONT_SIZE_CONFIG['figure_text'], style='italic')
     
     plt.tight_layout()
-    plt.subplots_adjust(top=0.96, bottom=0.08)
+    plt.subplots_adjust(top=0.93, bottom=0.10, hspace=0.35, wspace=0.3)
     
     # 保存圖表
     try:
