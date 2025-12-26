@@ -674,7 +674,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         if row['年化波動率 (%)'] != 'N/A':
             all_vol.append(float(row['年化波動率 (%)']))
         if row['最大回撤 (%)'] != 'N/A':
-            all_dd.append(float(row['最大回撤 (%)']))
+            # 最大回撤取絕對值後再加入範圍計算
+            all_dd.append(abs(float(row['最大回撤 (%)'])))
         if row['追蹤誤差 (%)'] != 'N/A':
             all_te.append(float(row['追蹤誤差 (%)']))
     
@@ -682,7 +683,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     return_min, return_max = (min(all_returns), max(all_returns)) if all_returns else (0, 1)
     sharpe_min, sharpe_max = (min(all_sharpe), max(all_sharpe)) if all_sharpe else (0, 1)
     vol_min, vol_max = (min(all_vol), max(all_vol)) if all_vol else (0, 1)
-    dd_min, dd_max = (min(all_dd), max(all_dd)) if all_dd else (-1, 0)
+    dd_min, dd_max = (min(all_dd), max(all_dd)) if all_dd else (0, 1)
     te_min, te_max = (min(all_te), max(all_te)) if all_te else (0, 1)
     
     def normalize_value(value, min_val, max_val, reverse=False):
@@ -715,8 +716,10 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
             vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
             values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
             
-            # 最大回撤取絕對值（通常是負數，如-15%，需轉為正數15%進行正規化）
-            dd_val = abs(float(row['最大回撤 (%)'])) if row['最大回撤 (%)'] != 'N/A' else dd_min
+            # 最大回撤取絕對值（在all_dd收集時已轉為正數，這裡直接使用）
+            dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+            if dd_val < 0:
+                dd_val = abs(dd_val)
             values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
             
             te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
@@ -896,8 +899,10 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
         values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
         
-        # 最大回撤取絕對值（通常是負數，如-15%，需轉為正數15%進行正規化）
-        dd_val = abs(float(row['最大回撤 (%)'])) if row['最大回撤 (%)'] != 'N/A' else dd_min
+        # 最大回撤取絕對值（在all_dd收集時已轉為正數，這裡直接使用）
+        dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+        if dd_val < 0:
+            dd_val = abs(dd_val)
         values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
         
         te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
