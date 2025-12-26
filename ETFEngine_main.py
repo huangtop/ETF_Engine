@@ -958,14 +958,14 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     legend1 = plt.legend(first_half[0], first_half[1], 
                         bbox_to_anchor=(1.15, 1.0), loc='upper left', 
-                        fontsize=27, frameon=True, fancybox=True, shadow=True,
-                        title='ETF 清單 (1)', title_fontsize=30)
+                        fontsize=16, frameon=True, fancybox=True, shadow=True,
+                        title='ETF 清單 (1)', title_fontsize=16)
     
     if second_half[0]:
         legend2 = plt.legend(second_half[0], second_half[1], 
                             bbox_to_anchor=(1.15, 0.5), loc='upper left', 
-                            fontsize=27, frameon=True, fancybox=True, shadow=True,
-                            title='ETF 清單 (2)', title_fontsize=30)
+                            fontsize=16, frameon=True, fancybox=True, shadow=True,
+                            title='ETF 清單 (2)', title_fontsize=16)
         plt.gca().add_artist(legend1)
     
     # 添加標記說明
@@ -977,8 +977,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     legend3 = plt.legend(handles=marker_legend_elements, 
                         bbox_to_anchor=(1.15, 0.2), loc='upper left',
-                        fontsize=33, frameon=True, fancybox=True, shadow=True,
-                        title='標記說明', title_fontsize=12)
+                        fontsize=16, frameon=True, fancybox=True, shadow=True,
+                        title='標記說明', title_fontsize=16)
     plt.gca().add_artist(legend1)
     if 'legend2' in locals():
         plt.gca().add_artist(legend2)
@@ -1177,8 +1177,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         
         plt.grid(True, alpha=0.3)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
-                   fontsize=9, frameon=True, fancybox=True, shadow=True,
-                   title='圖例', title_fontsize=10)
+                   fontsize=12, frameon=True, fancybox=True, shadow=True,
+                   title='圖例', title_fontsize=12)
         plt.axhline(y=100, color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
         plt.tight_layout()
         
@@ -1323,7 +1323,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         plt.grid(True, alpha=0.3)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
                    fontsize=14, frameon=True, fancybox=True, shadow=True,
-                   title=f'{category_name}\n實線：主動型\n虛線：被動型', title_fontsize=9)
+                   title=f'{category_name}\n實線：主動型\n虛線：被動型', title_fontsize=12)
         plt.tight_layout()
         
         # 儲存子圖到輸出資料夾
@@ -1436,7 +1436,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
         except KeyError:
             print(f"  ⚠️  警告: 未找到欄位 '{col}'，跳過此指標")
             ax.text(0.5, 0.5, f'缺少數據: {col}', ha='center', va='center', 
-                   transform=ax.transAxes, fontsize=10)
+                   transform=ax.transAxes, fontsize=12)
             continue
         
         # 繪製柱狀圖
@@ -1450,7 +1450,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
                 label_y = height + (max(values) * 0.02) if height >= 0 else height - (max(values) * 0.05)
                 ax.text(bar.get_x() + bar.get_width()/2., label_y,
                        f'{val:{fmt}}', ha='center', va='bottom' if height >= 0 else 'top',
-                       fontsize=9, fontweight='bold')
+                       fontsize=12, fontweight='bold')
         
         # 設置標題和標籤
         ax.set_title(metric_name, fontsize=FONT_SIZE_CONFIG['title_small']-4, fontweight='bold', pad=15)
@@ -1459,7 +1459,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
         
         # 簡化X軸標籤（只顯示代碼）
         ax.set_xticklabels([t.replace('.TW', '') for t in tickers], 
-                           rotation=45, ha='right', fontsize=9)
+                           rotation=45, ha='right', fontsize=10)
         
         # 網格和零線
         ax.grid(True, alpha=0.3, axis='y')
