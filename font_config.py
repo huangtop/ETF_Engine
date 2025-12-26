@@ -10,16 +10,16 @@ def setup_chinese_font_enhanced():
     """
     改进的中文字体设置
     支持macOS、Windows、Linux系统
+    优先使用绝对路径指定字体，确保CI环境有效
     """
-    # 首先尝试使用系统中文字体
-    system = matplotlib.rcParams['figure.figsize']
-    
+    # 首先尝试使用系统中文字体（绝对路径优先，确保CI有效）
     font_candidates = [
-        '/Library/Fonts/SimHei.ttf',      # macOS - Microsoft SimHei
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',  # Linux (CI环境)
+        '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',            # Linux (WenQuanYi备选)
         '/Library/Fonts/STHeiti Medium.ttc',  # macOS - STHeiti
+        '/Library/Fonts/SimHei.ttf',      # macOS - Microsoft SimHei
         '/System/Library/Fonts/STHeiti.ttc',  # macOS - STHeiti
         'C:\\Windows\\Fonts\\SimHei.ttf', # Windows
-        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',  # Linux
     ]
     
     # 尝试查找可用字体
@@ -27,6 +27,7 @@ def setup_chinese_font_enhanced():
     for candidate in font_candidates:
         if os.path.exists(candidate):
             font_path = candidate
+            print(f"✅ 使用字体: {font_path}")
             break
     
     # 如果没找到，使用系统默认中文字体列表
@@ -34,14 +35,19 @@ def setup_chinese_font_enhanced():
         prop = fm.FontProperties(fname=font_path)
         matplotlib.rcParams['font.sans-serif'] = [prop.get_name()]
     else:
-        # 使用备选字体列表
+        # 使用备选字体列表（无法指定文件时作为备选）
         font_list = [
+            'Noto Sans CJK TC',
+            'Noto Sans CJK SC', 
+            'Noto Sans CJK JP',
+            'WenQuanYi Zen Hei',
             'STHeiti',           # macOS
             'SimHei',            # Windows/Linux
             'DejaVu Sans',       # 备选
             'Liberation Sans',
         ]
         matplotlib.rcParams['font.sans-serif'] = font_list
+        print(f"⚠️  未找到字体文件，使用系统字体: {font_list}")
     
     # 其他配置
     matplotlib.rcParams['axes.unicode_minus'] = False
