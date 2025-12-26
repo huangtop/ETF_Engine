@@ -715,7 +715,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
             vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
             values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
             
-            dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+            # 最大回撤取絕對值（通常是負數，如-15%，需轉為正數15%進行正規化）
+            dd_val = abs(float(row['最大回撤 (%)'])) if row['最大回撤 (%)'] != 'N/A' else dd_min
             values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
             
             te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
@@ -849,7 +850,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
         values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
         
-        dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+        # 最大回撤取絕對值（通常是負數，如-15%，需轉為正數15%進行正規化）
+        dd_val = abs(float(row['最大回撤 (%)'])) if row['最大回撤 (%)'] != 'N/A' else dd_min
         values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
         
         te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
