@@ -953,11 +953,11 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     n_cols = 3  # 改為3列
     n_rows = (n_items + n_cols - 1) // n_cols
     
-    # 合併所有 ETF 清單，不分 (1) 和 (2)
+    # 合併所有 ETF 清單，不分 (1) 和 (2)，放在圖表右邊
     legend1 = plt.legend(handles, labels, 
-                        bbox_to_anchor=(1.05, 1.0), loc='upper left', 
-                        fontsize=14, frameon=True, fancybox=True, shadow=True,
-                        title='ETF 清單', title_fontsize=16, ncol=3)
+                        bbox_to_anchor=(1.05, 1.0), loc='upper right', 
+                        fontsize=13, frameon=True, fancybox=True, shadow=True,
+                        title='ETF 清單', title_fontsize=15, ncol=1)
     
     # 移除標記說明，直接保存圖例
     plt.gca().add_artist(legend1)
