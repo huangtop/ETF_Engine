@@ -1088,19 +1088,19 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         
         # 先繪製基準指數（較粗的線條）
         try:
-            # 台股基準 - 加權指數
-            print("正在下載台股基準指數...")
-            tw_index = yf.download('^TWII', start=start_date_3y, end=latest_date, progress=False)
+            # 台股基準 - 改用台灣50(0050)以保持與trend_tw_stock.png一致
+            print("正在下載台灣50基準指數...")
+            tw_index = yf.download('0050.TW', start=start_date_3y, end=latest_date, progress=False)
             if not tw_index.empty:
                 tw_prices = tw_index['Close']
                 if isinstance(tw_prices, pd.DataFrame):
                     tw_prices = tw_prices.iloc[:, 0]
                 tw_normalized = (tw_prices / tw_prices.iloc[0]) * 100
                 plt.plot(tw_normalized.index, tw_normalized, 
-                        label='台股加權指數', linewidth=3, color='#FF0000', 
+                        label='台灣50 (0050)', linewidth=3, color='#FF0000', 
                         linestyle='--', alpha=0.8)
         except Exception as e:
-            print(f"台股指數下載失敗: {e}")
+            print(f"台灣50下載失敗: {e}")
         
         try:
             # 美股基準 - S&P 500
@@ -1177,8 +1177,13 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         plt.close()
     
     # 2. 子圖函數：以基準指數正規化
-    def plot_category_trend(etf_group, benchmark_ticker, benchmark_name, category_name, filename, benchmark_color, etf_type_prefix=""):
-        """繪製分類趨勢圖，以基準指數為標準正規化"""
+    def plot_category_trend(etf_group, benchmark_ticker, benchmark_name, category_name, filename, benchmark_color, comparison_start_date, etf_type_prefix="", use_fixed_start=False, fixed_start_date=None):
+        """繪製分類趨勢圖，以基準指數為標準正規化
+        
+        Args:
+            use_fixed_start: 是否使用固定的起始日期（僅針對主動式ETF）
+            fixed_start_date: 固定起始日期（如 '2025-07-22'）
+        """
         
         if not etf_group:
             print(f"⚠️  {category_name}無ETF資料，跳過")
@@ -1211,8 +1216,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             return
         
         # comparison_start = latest_etf_start.strftime('%Y-%m-%d')
-        comparison_start = common_start_date
-        print(f"📅 {category_name}統一比較期間: {comparison_start} 至 {latest_date}")
+        # 使用傳入的 comparison_start_date 而不是全域的 common_start_date
+        print(f"📅 {category_name}統一比較期間: {comparison_start_date} 至 {latest_date}")
         
         plt.figure(figsize=(14, 8))
         
@@ -1220,48 +1225,74 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         benchmark_data = None
         try:
             print(f"📊 下載{benchmark_name}基準資料...")
-            benchmark_df = yf.download(benchmark_ticker, start=comparison_start, end=latest_date, progress=False)
+            benchmark_df = yf.download(benchmark_ticker, start=comparison_start_date, end=latest_date, progress=False)
             if not benchmark_df.empty:
                 benchmark_prices = benchmark_df['Close']
                 if isinstance(benchmark_prices, pd.DataFrame):
                     benchmark_prices = benchmark_prices.iloc[:, 0]
                 
-                # 基準指數設為100基準線
-                benchmark_normalized = (benchmark_prices / benchmark_prices.iloc[0]) * 100
                 benchmark_data = benchmark_prices  # 保存原始價格用於正規化
                 
-                plt.plot(benchmark_normalized.index, benchmark_normalized, 
-                        label=f'{benchmark_name} (基準)', linewidth=4, color=benchmark_color, 
-                        linestyle='-', alpha=0.9, zorder=10)
+                # 基準就是100（畫一條水平線）
+                plt.axhline(y=100, color=benchmark_color, linestyle='-', linewidth=4, 
+                           label=f'{benchmark_name} (基準=100)', alpha=0.9, zorder=10)
         except Exception as e:
             print(f"{benchmark_name}基準下載失敗: {e}")
         
-        # 繪製該組ETF，以基準指數正規化
+        # 繪製該組ETF，使用絕對正規化（各自從100開始）
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C70039', '#7BC225']
         
         for i, (ticker, name) in enumerate(etf_group.items()):
             try:
-                df = yf.download(ticker, start=comparison_start, end=latest_date, progress=False)
+                df = yf.download(ticker, start=comparison_start_date, end=latest_date, progress=False)
                 if not df.empty:
                     etf_prices = df['Close']
                     if isinstance(etf_prices, pd.DataFrame):
                         etf_prices = etf_prices.iloc[:, 0]
                     
+                    # 對齐日期：找出 ETF 和基準的共同日期
                     if benchmark_data is not None:
-                        # 對齊日期索引
                         common_dates = etf_prices.index.intersection(benchmark_data.index)
-                        if len(common_dates) > 10:
+                        if len(common_dates) > 0:
                             etf_aligned = etf_prices.loc[common_dates]
                             benchmark_aligned = benchmark_data.loc[common_dates]
                             
-                            # 以基準指數為標準正規化：(ETF/ETF_start) / (Benchmark/Benchmark_start) * 100
-                            etf_relative = (etf_aligned / etf_aligned.iloc[0]) / (benchmark_aligned / benchmark_aligned.iloc[0]) * 100
+                            # 相對表現 = (ETF漲幅 / 基準漲幅) × 100
+                            # 使用 2025-07-22 或 ETF 上市日期中較晚者作為起始點
+                            comparison_date = pd.to_datetime(comparison_start_date)
+                            etf_start_date = etf_prices.index[0]
+                            use_start_date = max(comparison_date, etf_start_date)
+                            
+                            # 找出起始點的價格
+                            if use_start_date in etf_aligned.index and use_start_date in benchmark_aligned.index:
+                                etf_start_price = etf_aligned.loc[use_start_date]
+                                benchmark_start_price = benchmark_aligned.loc[use_start_date]
+                                
+                                # 對齐到起始日期之後的資料
+                                etf_aligned = etf_aligned.loc[etf_aligned.index >= use_start_date]
+                                benchmark_aligned = benchmark_aligned.loc[benchmark_aligned.index >= use_start_date]
+                                
+                                # 相對報酬
+                                etf_return = etf_aligned / etf_start_price
+                                benchmark_return = benchmark_aligned / benchmark_start_price
+                                etf_normalized = (etf_return / benchmark_return) * 100
+                                plot_index = etf_aligned.index
+                            else:
+                                # 找不到精確起始點，使用共同日期的第一個
+                                etf_start_price = etf_aligned.iloc[0]
+                                benchmark_start_price = benchmark_aligned.iloc[0]
+                                etf_return = etf_aligned / etf_start_price
+                                benchmark_return = benchmark_aligned / benchmark_start_price
+                                etf_normalized = (etf_return / benchmark_return) * 100
+                                plot_index = etf_aligned.index
                         else:
-                            # 如果對齊失敗，使用傳統正規化
-                            etf_relative = (etf_prices / etf_prices.iloc[0]) * 100
+                            # 如果沒有共同日期，使用 ETF 自己的範圍正規化
+                            etf_normalized = (etf_prices / etf_prices.iloc[0]) * 100
+                            plot_index = etf_prices.index
                     else:
-                        # 如果沒有基準資料，使用傳統正規化
-                        etf_relative = (etf_prices / etf_prices.iloc[0]) * 100
+                        # 如果沒有基準資料，使用 ETF 自己的範圍正規化
+                        etf_normalized = (etf_prices / etf_prices.iloc[0]) * 100
+                        plot_index = etf_prices.index
                     
                     color = colors[i % len(colors)]
                     
@@ -1271,7 +1302,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     # 主動型ETF用實線，被動型用虛線
                     line_style = '-' if '主動' in name else '--'
                     
-                    plt.plot(etf_relative.index, etf_relative, 
+                    plt.plot(plot_index, etf_normalized, 
                             label=display_name, linewidth=2.5, color=color, 
                             linestyle=line_style, alpha=0.8)
             except Exception as e:
@@ -1323,6 +1354,10 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
     # 執行繪製
     print("📈 開始繪製趨勢圖...")
     
+    # 判斷是否為主動式 ETF（使用固定起始日期）
+    use_fixed_start_for_trends = (config_type == 'active_etf')
+    fixed_start_date_for_trends = start_date_3y if use_fixed_start_for_trends else None
+    
     # 總覽圖
     plot_overview()
     
@@ -1334,7 +1369,10 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         '美股相關ETF', 
         'trend_us_etfs.png',
         '#0066CC',
-        etf_type_prefix
+        common_start_date,
+        etf_type_prefix,
+        use_fixed_start=use_fixed_start_for_trends,
+        fixed_start_date=fixed_start_date_for_trends
     )
     
     # 台股高股息ETF vs 元大高股息(0056)
@@ -1345,7 +1383,10 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         '台股高股息ETF', 
         'trend_tw_dividend.png',
         '#FF6600',
-        etf_type_prefix
+        common_start_date,
+        etf_type_prefix,
+        use_fixed_start=use_fixed_start_for_trends,
+        fixed_start_date=fixed_start_date_for_trends
     )
     
     # 台股股票型ETF vs 台灣50(0050)
@@ -1356,7 +1397,10 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         '台股股票型ETF', 
         'trend_tw_stock.png',
         '#CC0000',
-        etf_type_prefix
+        common_start_date,
+        etf_type_prefix,
+        use_fixed_start=use_fixed_start_for_trends,
+        fixed_start_date=fixed_start_date_for_trends
     )
     
     print(f"\n📊 趨勢圖繪製完成！")
