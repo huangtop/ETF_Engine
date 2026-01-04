@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-自動抓取台灣 ETF 費用率並更新 JSON 配置
+管理台灣 ETF 費用率資料庫
 數據來源：
-1. Yahoo Finance API
-2. 本地緩存數據庫
-3. 手動輸入
+1. 本地手動維護的資料庫（已知數據）
+2. JSON 配置文件（動態更新）
+3. 基金公司官網（需手動更新）
 """
 
 import json
 import os
 from datetime import datetime
-import yfinance as yf
 
 # 已知的費用率數據（台灣 ETF）
+# 資料來源：各基金公司官方網站、基金年報
+# 最後更新時間：2025-01-04
 KNOWN_EXPENSE_RATIOS = {
     # 主動型 ETF
     '00980A.TW': 0.785,      # 主動野村台灣優選
@@ -86,24 +87,6 @@ KNOWN_EXPENSE_RATIOS = {
 }
 
 
-def try_fetch_from_yfinance(ticker):
-    """嘗試從 Yahoo Finance 獲取費用率"""
-    try:
-        etf = yf.Ticker(ticker)
-        info = etf.info
-        
-        if 'expenseRatio' in info:
-            return info['expenseRatio'] * 100  # 轉換為百分比
-        
-        if 'trailingExpenseRatio' in info:
-            return info['trailingExpenseRatio'] * 100
-        
-    except Exception as e:
-        print(f"   ⚠️  {ticker} Yahoo Finance 查詢失敗: {type(e).__name__}")
-    
-    return None
-
-
 def load_config(config_type='active_etf'):
     """加載配置文件"""
     config_path = os.path.join('etf_configs', f'{config_type}.json')
@@ -130,8 +113,10 @@ def save_config(config, config_type='active_etf'):
         return False
 
 
-def update_expense_ratio(config_type='active_etf', use_yfinance=True):
-    """更新費用率"""
+def update_expense_ratio(config_type='active_etf'):
+    """更新費用率（從本地資料庫）
+    
+    """
     print(f"\n{'='*70}")
     print(f"ETF 費用率更新工具 - {config_type}")
     print(f"{'='*70}\n")
@@ -151,63 +136,62 @@ def update_expense_ratio(config_type='active_etf', use_yfinance=True):
         config['expense_ratio'] = {}
     
     print(f"\n{'='*70}")
-    print("開始更新費用率:")
+    print("開始更新費用率（從本地資料庫）:")
     print(f"{'='*70}\n")
     
     updated_count = 0
-    failed_count = 0
+    missing_count = 0
     
-    for ticker, name in etf_list:
-        ticker_clean = ticker.strip()
-        name_clean = name.strip()
+    for item in etf_list:
+        # 支持對象和數組兩種格式
+        if isinstance(item, dict):
+            ticker = item.get('ticker', '').strip()
+            name = item.get('name', '').strip()
+        else:
+            ticker = item[0].strip()
+            name = item[1].strip()
         
-        old_value = config['expense_ratio'].get(ticker_clean)
+        if not ticker:
+            continue
+        
+        old_value = config['expense_ratio'].get(ticker)
         new_value = None
-        source = None
         
-        # 1. 先嘗試已知數據庫
-        if ticker_clean in KNOWN_EXPENSE_RATIOS:
-            new_value = KNOWN_EXPENSE_RATIOS[ticker_clean]
-            source = "本地數據庫"
+        # 從本地資料庫查找費用率
+        if ticker in KNOWN_EXPENSE_RATIOS:
+            new_value = KNOWN_EXPENSE_RATIOS[ticker]
         
-        # 2. 如果啟用了 Yahoo Finance，嘗試獲取最新數據
-        if use_yfinance and new_value is None:
-            print(f"  🔍 {ticker_clean} ({name_clean})...", end=" ")
-            yf_value = try_fetch_from_yfinance(ticker_clean)
-            if yf_value is not None:
-                new_value = round(yf_value, 3)
-                source = "Yahoo Finance"
-                print(f"✅ {new_value}%")
-            else:
-                print("查詢失敗")
-        
-        # 3. 顯示結果
+        # 顯示結果
         if new_value is not None:
-            config['expense_ratio'][ticker_clean] = new_value
+            config['expense_ratio'][ticker] = new_value
             
             if old_value is None:
-                print(f"  ✅ {ticker_clean} ({name_clean})")
-                print(f"     新增: {new_value}% (來源: {source})")
+                print(f"  ✅ {ticker} ({name})")
+                print(f"     新增: {new_value}%")
                 updated_count += 1
             elif old_value != new_value:
-                print(f"  ✅ {ticker_clean} ({name_clean})")
-                print(f"     {old_value}% → {new_value}% (來源: {source})")
+                print(f"  ✅ {ticker} ({name})")
+                print(f"     {old_value}% → {new_value}%")
                 updated_count += 1
             else:
-                print(f"  ➜ {ticker_clean} ({name_clean}): {new_value}% (無變化)")
+                print(f"  ➜ {ticker} ({name}): {new_value}% (無變化)")
         else:
-            print(f"  ⚠️  {ticker_clean} ({name_clean}): 未找到費用率")
+            print(f"  ⚠️  {ticker} ({name}): 本地資料庫中未找到費用率")
             # 保留現有值或設置為 null
-            if ticker_clean not in config['expense_ratio']:
-                config['expense_ratio'][ticker_clean] = None
-            failed_count += 1
+            if ticker not in config['expense_ratio']:
+                config['expense_ratio'][ticker] = None
+            missing_count += 1
     
     # 保存更新後的配置
     print(f"\n{'='*70}")
     if save_config(config, config_type):
-        print(f"✅ 成功更新 {updated_count} 支 ETF 的費用率")
-        if failed_count > 0:
-            print(f"⚠️  {failed_count} 支 ETF 未找到費用率數據 (設置為 null)")
+        print(f"✅ 成功同步 {updated_count} 支 ETF 的費用率")
+        if missing_count > 0:
+            print(f"⚠️  {missing_count} 支 ETF 在本地資料庫中未找到 (設置為 null)")
+        print(f"\n📝 如需更新費用率，請:")
+        print(f"   1. 訪問各基金公司官方網站")
+        print(f"   2. 更新 KNOWN_EXPENSE_RATIOS 字典")
+        print(f"   3. 重新運行此腳本")
         return True
     else:
         print("❌ 保存失敗")
@@ -226,23 +210,55 @@ def list_known_expense_ratios():
     print(f"\n共 {len(KNOWN_EXPENSE_RATIOS)} 支 ETF\n")
 
 
+def update_expense_ratio_manual(ticker, new_ratio):
+    """手動更新特定 ETF 的費用率"""
+    print(f"\n📝 手動更新費用率")
+    print(f"更新 {ticker} 的費用率為 {new_ratio}%")
+    
+    # 更新本地資料庫
+    KNOWN_EXPENSE_RATIOS[ticker] = new_ratio
+    
+    # 也更新所有配置文件
+    for config_type in ['active_etf', 'high_dividend_etf', 'industry_etf']:
+        config = load_config(config_type)
+        if config and 'expense_ratio' in config:
+            config['expense_ratio'][ticker] = new_ratio
+            save_config(config, config_type)
+    
+    print(f"✅ {ticker} 的費用率已更新為 {new_ratio}%")
+
+
 if __name__ == '__main__':
     import sys
     
     # 解析命令行參數
-    config_type = 'active_etf'
-    use_yfinance = True
-    
     if len(sys.argv) > 1:
         if sys.argv[1] == '--list':
             list_known_expense_ratios()
             sys.exit(0)
+        elif sys.argv[1] == '--help':
+            print(f"\n{'='*70}")
+            print("ETF 費用率管理工具")
+            print(f"{'='*70}\n")
+            print("用法:")
+            print("  python fetch_expense_ratio.py [config_type]")
+            print("  python fetch_expense_ratio.py --list")
+            print("  python fetch_expense_ratio.py --help")
+            print("\n說明:")
+            print("  - 同步本地資料庫的費用率到配置文件")
+            print("  - 費用率數據由基金公司官網手動維護")
+            print("\n如需更新費用率:")
+            print("  1. 訪問各基金公司官方網站確認最新費用率")
+            print("  2. 編輯本腳本中的 KNOWN_EXPENSE_RATIOS 字典")
+            print("  3. 運行此腳本同步到配置文件\n")
+            sys.exit(0)
         else:
             config_type = sys.argv[1]
-    
-    if '--no-yfinance' in sys.argv:
-        use_yfinance = False
-        print("⚠️  已禁用 Yahoo Finance 查詢，只使用本地數據")
-    
-    update_expense_ratio(config_type, use_yfinance=use_yfinance)
+            update_expense_ratio(config_type)
+    else:
+        # 默認更新所有配置類型
+        for config_type in ['active_etf', 'high_dividend_etf', 'industry_etf']:
+            update_expense_ratio(config_type)
+            print()
+
 

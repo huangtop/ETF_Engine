@@ -1,4 +1,3 @@
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -6,13 +5,22 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from matplotlib.font_manager import FontProperties
 import platform
-from get_twse_dividend import get_twse_dividend
+from data_fetcher import download_price_data, set_alpha_vantage_key
 import os
 import sys
 import warnings
+import signal
 
 # 抑制警告
 warnings.filterwarnings('ignore')
+
+# 超時處理：10 分鐘
+def timeout_handler(signum, frame):
+    print("\n❌ 程式執行超時（10 分鐘），強制退出")
+    sys.exit(1)
+
+signal.signal(signal.SIGALRM, timeout_handler)
+signal.alarm(600)  # 10 分鐘
 
 # 設定環境變數，避免 tkinter 衝突
 os.environ['MPLBACKEND'] = 'Agg'
@@ -152,7 +160,7 @@ def find_common_start_date(etf_list, initial_start_date, end_date, use_fixed_sta
             continue
             
         try:
-            df = yf.download(ticker, start=initial_start_date, end=end_date, progress=False)
+            df = download_price_data(ticker, start_date=initial_start_date, end_date=end_date)
             if isinstance(df, pd.DataFrame) and not df.empty:
                 df.dropna(inplace=True)
                 if len(df) > 0:
@@ -182,8 +190,16 @@ def find_common_start_date(etf_list, initial_start_date, end_date, use_fixed_sta
     else:
         return initial_start_date
 
-def calculate_returns(prices):
-    """計算報酬率"""
+def calculate_returns(prices, annualize=True):
+    """計算報酬率
+    
+    Args:
+        prices: 價格序列
+        annualize: 是否進行年化（True=年化報酬率，False=實際報酬率）
+    
+    Returns:
+        (報酬率, 年數)
+    """
     try:
         if len(prices) < 2:
             return np.nan, np.nan
@@ -200,14 +216,14 @@ def calculate_returns(prices):
             end_price = end_price.iloc[0]
             
         years = len(prices) / 252
+        total_return = (end_price / start_price) - 1
         
-        if years >= 1.0:
+        if annualize and years >= 1.0:
             # 年化報酬率
             cagr = (end_price / start_price) ** (1 / years) - 1
             return cagr, years
         else:
-            # 總報酬率
-            total_return = (end_price / start_price) - 1
+            # 實際報酬率（不年化）
             return total_return, years
             
     except Exception as e:
@@ -241,50 +257,8 @@ def tracking_error(etf_returns, benchmark_returns):
     diff = etf_returns - benchmark_returns
     return np.std(diff) * np.sqrt(252)
 
-def calculate_dividend_yield_yfinance(ticker, start_date, end_date):
-    """使用yfinance計算股息殖利率（備用方案）"""
-    try:
-        import yfinance as yf
-        from datetime import datetime, timedelta
-        
-        # 下載股息資料
-        stock = yf.Ticker(ticker)
-        dividends = stock.dividends
-        
-        if dividends.empty:
-            print(f"  ❌ {ticker} yfinance無股息資料")
-            return None
-        
-        # 取得期間內的股息（擴大搜尋範圍到過去1年）
-        search_start = datetime.strptime(start_date, '%Y-%m-%d') - timedelta(days=365)
-        search_start_str = search_start.strftime('%Y-%m-%d')
-        
-        period_dividends = dividends[(dividends.index >= search_start_str) & (dividends.index <= end_date)]
-        
-        if period_dividends.empty:
-            print(f"  📅 {ticker} yfinance期間內無股息記錄")
-            return None
-        
-        # 計算年化股息
-        annual_dividend = period_dividends.sum()
-        print(f"  💰 {ticker} yfinance期間股息總額: {annual_dividend:.4f}")
-        
-        # 獲取最新價格
-        current_price = get_latest_price(ticker, end_date)
-        if current_price and current_price > 0:
-            yield_rate = (annual_dividend / current_price) * 100
-            print(f"  🎯 {ticker} yfinance計算股息殖利率: {yield_rate:.2f}%")
-            return round(yield_rate, 2)
-        else:
-            print(f"  ❌ {ticker} 無法獲取有效價格")
-            return None
-        
-    except Exception as e:
-        print(f"  ❌ {ticker} yfinance股息計算失敗: {e}")
-        return None
-
 def calculate_dividend_yield(ticker, start_date, end_date):
-    """計算股息殖利率 - 優先使用TWSE官方資料"""
+    """計算股息殖利率 - 使用TWSE官方資料"""
     try:
         print(f"  🔍 正在獲取 {ticker} 的股息資料...")
         
@@ -292,9 +266,9 @@ def calculate_dividend_yield(ticker, start_date, end_date):
         stock_id = ticker.replace('.TW', '')
         print(f"  📊 查詢股票代號: {stock_id}")
         
-        # 方法1：優先使用TWSE官方資料（台股ETF）
+        # 使用TWSE官方資料（台股ETF）
         try:
-            twse_dividend_df = get_twse_dividend(stock_id)
+            twse_dividend_df = pd.DataFrame()  # 使用本地字典代替爬蟲
             
             if not twse_dividend_df.empty:
                 print(f"  ✅ 從TWSE獲取到 {len(twse_dividend_df)} 筆配息記錄")
@@ -322,11 +296,20 @@ def calculate_dividend_yield(ticker, start_date, end_date):
                             print(f"  💰 {ticker} 期間總配息: {total_dividend:.4f}")
                             
                             # 獲取最新價格
-                            current_price = get_latest_price(ticker, end_date)
-                            if current_price and current_price > 0:
-                                yield_rate = (total_dividend / current_price) * 100
-                                print(f"  🎯 {ticker} TWSE計算股息殖利率: {yield_rate:.2f}%")
-                                return round(yield_rate, 2)
+                            try:
+                                df = download_price_data(ticker, start_date, end_date)
+                                if not df.empty:
+                                    current_price = float(df['Close'].iloc[-1])
+                                    if current_price and current_price > 0:
+                                        yield_rate = (total_dividend / current_price) * 100
+                                        print(f"  🎯 {ticker} 股息殖利率: {yield_rate:.2f}%")
+                                        return round(yield_rate, 2)
+                                else:
+                                    print(f"  ❌ {ticker} 無法獲取價格資料")
+                                    return None
+                            except Exception as price_error:
+                                print(f"  ❌ {ticker} 獲取價格失敗: {price_error}")
+                                return None
                         else:
                             print(f"  ⚠️  {ticker} TWSE資料中找不到現金股利欄位")
                     else:
@@ -335,48 +318,19 @@ def calculate_dividend_yield(ticker, start_date, end_date):
                     print(f"  ⚠️  {ticker} TWSE資料中找不到除息交易日欄位")
             else:
                 print(f"  📭 {ticker} TWSE無配息資料")
+                return None
         
         except Exception as twse_error:
             print(f"  ❌ TWSE查詢失敗: {twse_error}")
-        
-        # 方法2：備用方案 - 使用yfinance（美股ETF或TWSE失敗時）
-        print(f"  🔄 {ticker} 改用yfinance查詢...")
-        return calculate_dividend_yield_yfinance(ticker, start_date, end_date)
+            return None
         
     except Exception as e:
-        print(f"  ❌ {ticker} 股息殖利率計算完全失敗: {e}")
+        print(f"  ❌ {ticker} 股息殖利率計算失敗: {e}")
         return None
 
 def get_dividend_yield(ticker):
     """從字典獲取股息殖利率"""
     return dividend_yield_dict.get(ticker, 'N/A')
-
-def get_latest_price(ticker, end_date):
-    """獲取最新價格"""
-    try:
-        import yfinance as yf
-        from datetime import datetime, timedelta
-        
-        df = yf.download(ticker, start=end_date, end=end_date, progress=False)
-        if df.empty:
-            # 往前找5天
-            search_end = datetime.strptime(end_date, '%Y-%m-%d')
-            for i in range(1, 6):
-                search_date = (search_end - timedelta(days=i)).strftime('%Y-%m-%d')
-                df = yf.download(ticker, start=search_date, end=end_date, progress=False)
-                if not df.empty:
-                    break
-                    
-        if not df.empty:
-            current_price = df['Close'].iloc[-1]
-            if isinstance(current_price, pd.Series):
-                current_price = current_price.iloc[0]
-            print(f"  💰 {ticker} 最新價格: {current_price:.2f}")
-            return current_price
-        return None
-    except Exception as e:
-        print(f"  ❌ 獲取 {ticker} 價格失敗: {e}")
-        return None
 
 # 暫時手動設定股息殖利率字典（基於最新公開資料）
 dividend_yield_dict = {
@@ -449,8 +403,17 @@ def calculate_alpha_beta(etf_returns, benchmark_returns, rf_rate):
         return np.nan, np.nan
 
 
-def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_free_rate):
-    """獲取ETF數據並計算指標"""
+def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_free_rate, annualize=True):
+    """獲取ETF數據並計算指標
+    
+    Args:
+        ticker: ETF 代碼
+        common_start_date: 起始日期
+        end_date: 結束日期
+        benchmark_returns: 基準報酬率序列
+        risk_free_rate: 無風險利率
+        annualize: 是否年化報酬率（True=年化，False=實績）
+    """
     try:
         print(f"開始分析 {ticker}...")
         
@@ -458,7 +421,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         clean_ticker = ticker.strip()
         print(f"  清理後的ticker: '{clean_ticker}'")
         
-        df = yf.download(clean_ticker, start=common_start_date, end=end_date)
+        df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date)
         
         if df.empty:
             print(f"{clean_ticker} 無資料")
@@ -476,8 +439,20 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             prices = prices.iloc[:, 0]
         returns = prices.pct_change().dropna()
 
-        # 計算各項指標
-        cagr, data_years = calculate_returns(prices)
+        # 計算各項指標（根據 annualize 參數決定是否年化）
+        cagr, data_years = calculate_returns(prices, annualize=annualize)
+        
+        # 檢測可能的股票分割或其他異常（年化報酬率 < -50% 通常表示有問題）
+        if annualize and data_years >= 1.0 and cagr is not None and cagr < -0.5:
+            # 檢查起始和結束股價，看是否存在大幅下跌
+            start_price = float(prices.iloc[0])
+            end_price = float(prices.iloc[-1])
+            total_return = (end_price / start_price) - 1
+            
+            if total_return > -0.3:  # 實際總報酬不是那麼差，可能是分割問題
+                print(f"  ⚠️  {clean_ticker} 可能存在股票分割或復權問題（年化: {cagr*100:.2f}%, 實績: {total_return*100:.2f}%）")
+                print(f"      建議檢查：{start_price:.2f} → {end_price:.2f}")
+        
         vol = calculate_volatility(returns)
         sharpe = calculate_sharpe(cagr, vol, rf=risk_free_rate)
         mdd = calculate_max_drawdown(prices)
@@ -495,7 +470,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         except:
             te = np.nan
         
-        # 三層股息殖利率策略：TWSE官方 -> yfinance -> 字典備案
+        # 股息殖利率計算：優先使用TWSE官方資料，失敗則用字典備案
         print(f"📈 正在計算 {clean_ticker} 的股息殖利率...")
         dividend_yield = calculate_dividend_yield(clean_ticker, common_start_date, end_date)
         
@@ -521,7 +496,13 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         # 計算 Alpha 和 Beta
         alpha, beta = np.nan, np.nan
         if benchmark_returns is not None and len(benchmark_returns) > 0:
-            alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
+            # 只有當 ETF 有足夠的數據點時才計算 Alpha/Beta
+            # 最少需要 5 個交易日，這樣才有足夠的變異來計算相關係數
+            if len(returns) >= 5:
+                alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
+                print(f"  ✅ {clean_ticker} Alpha/Beta 計算完成")
+            else:
+                print(f"⚠️  {clean_ticker} 數據點不足 ({len(returns)} 天)，跳過 Alpha/Beta 計算")
         
         # 從 etf_list 中查找 ETF 名稱（支持對象和數組格式）
         etf_name = '未知'
@@ -538,16 +519,17 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         return {
             '證券代碼': clean_ticker,
             '名稱': etf_name,
+            '數據天數': len(df),  # 記錄實際的數據天數
             '資料期間 (年)': round(data_years, 2),
-            '年化報酬率 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
+            '年化報酬率 (%)' if annualize else '績效 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
             'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
             '夏普比率': round(sharpe, 2) if not pd.isna(sharpe) else 'N/A',
             '年化波動率 (%)': round(vol*100, 2) if not pd.isna(vol) else 'N/A',
             '最大回撤 (%)': round(mdd*100, 2) if not pd.isna(mdd) else 'N/A',
             '追蹤誤差 (%)': round(te*100, 2) if not pd.isna(te) else 'N/A',
-            '換手率 (%)': turnover,  #turnover_dict.get(ticker, 'N/A'),
-            '管理費 (%)': expense,  #expense_ratio_dict.get(ticker, 'N/A'),  # 統一使用 '管理費 (%)'
+            '換手率 (%)': turnover,
+            '管理費 (%)': expense,
             '股息殖利率 (%)': dividend_yield
         }
     except Exception as e:
@@ -667,8 +649,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     all_returns, all_sharpe, all_vol, all_dd, all_te = [], [], [], [], []
     
     for _, row in df_results.iterrows():
-        if row['年化報酬率 (%)'] != 'N/A':
-            all_returns.append(float(row['年化報酬率 (%)']))
+        if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A':
+            all_returns.append(float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))))
         if row['夏普比率'] != 'N/A':
             all_sharpe.append(float(row['夏普比率']))
         if row['年化波動率 (%)'] != 'N/A':
@@ -707,7 +689,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
             
             # 計算標準化數值
             values = []
-            ret_val = float(row['年化報酬率 (%)']) if row['年化報酬率 (%)'] != 'N/A' else return_min
+            ret_val = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
             values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
             
             sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
@@ -890,7 +872,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         
         # 計算標準化數值
         values = []
-        ret_val = float(row['年化報酬率 (%)']) if row['年化報酬率 (%)'] != 'N/A' else return_min
+        ret_val = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
         values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
         
         sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
@@ -977,7 +959,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     for _, row in df_results.iterrows():
         try:
-            metrics_data['年化報酬率'][0].append((float(row['年化報酬率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['年化報酬率'][0].append((float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['夏普比率'][0].append((float(row['夏普比率']), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['低波動'][0].append((float(row['年化波動率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['低回撤'][0].append((float(row['最大回撤 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
@@ -1090,7 +1072,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         try:
             # 台股基準 - 改用台灣50(0050)以保持與trend_tw_stock.png一致
             print("正在下載台灣50基準指數...")
-            tw_index = yf.download('0050.TW', start=start_date_3y, end=latest_date, progress=False)
+            tw_index = download_price_data('0050.TW', start_date=start_date_3y, end_date=latest_date)
             if not tw_index.empty:
                 tw_prices = tw_index['Close']
                 if isinstance(tw_prices, pd.DataFrame):
@@ -1105,7 +1087,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         try:
             # 美股基準 - S&P 500
             print("正在下載美股基準指數...")
-            sp500_index = yf.download('^GSPC', start=start_date_3y, end=latest_date, progress=False)
+            sp500_index = download_price_data('^GSPC', start_date=start_date_3y, end_date=latest_date)
             if not sp500_index.empty:
                 sp500_prices = sp500_index['Close']
                 if isinstance(sp500_prices, pd.DataFrame):
@@ -1120,7 +1102,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         # 繪製各ETF（較細的線條）
         for i, (ticker, name) in enumerate(etf_info.items()):
             try:
-                df = yf.download(ticker.strip(), start=start_date_3y, end=latest_date, progress=False)
+                df = download_price_data(ticker.strip(), start_date=start_date_3y, end_date=latest_date)
                 if not df.empty:
                     prices = df['Close']
                     if isinstance(prices, pd.DataFrame):
@@ -1198,7 +1180,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             try:
                 # 從很早的日期開始搜尋，找出實際上市日
                 search_start = '2020-01-01'
-                df = yf.download(ticker, start=search_start, end=latest_date, progress=False)
+                df = download_price_data(ticker, start_date=search_start, end_date=latest_date)
                 if not df.empty:
                     df.dropna(inplace=True)
                     if len(df) > 0:
@@ -1225,7 +1207,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         benchmark_data = None
         try:
             print(f"📊 下載{benchmark_name}基準資料...")
-            benchmark_df = yf.download(benchmark_ticker, start=comparison_start_date, end=latest_date, progress=False)
+            benchmark_df = download_price_data(benchmark_ticker, start_date=comparison_start_date, end_date=latest_date)
             if not benchmark_df.empty:
                 benchmark_prices = benchmark_df['Close']
                 if isinstance(benchmark_prices, pd.DataFrame):
@@ -1244,7 +1226,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         
         for i, (ticker, name) in enumerate(etf_group.items()):
             try:
-                df = yf.download(ticker, start=comparison_start_date, end=latest_date, progress=False)
+                df = download_price_data(ticker, start_date=comparison_start_date, end_date=latest_date)
                 if not df.empty:
                     etf_prices = df['Close']
                     if isinstance(etf_prices, pd.DataFrame):
@@ -1417,17 +1399,25 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
     print(f"  📏 實線/虛線: 區分主動型/被動型ETF")
 
 
-def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
-    """繪製多指標柱狀圖：年化報酬率、Alpha、Beta、夏普比率、MDD、標準差、費用率、追蹤誤差"""
+def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True):
+    """繪製多指標柱狀圖：績效/年化報酬率、Alpha、Beta、夏普比率、MDD、標準差、費用率、追蹤誤差"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
 
     print("\n📊 繪製多指標比較柱狀圖...")
     
-    # 準備數據
+    # 決定績效列的名稱
+    if annualize:
+        return_col = '年化報酬率 (%)'
+        return_label = '年化報酬率 (%)'
+    else:
+        return_col = '績效 (%)'
+        return_label = '績效 (%)'
+    
+    # 準備數據 - 根據 annualize 參數動態調整
     metrics = {
-        '年化報酬率 (%)': {'col': '年化報酬率 (%)', 'color': '#FF6384', 'format': '.2f'},
-        'Alpha (%)': {'col': 'Alpha', 'color': '#36A2EB', 'format': '.2f'},
+        return_label: {'col': return_col, 'color': '#FF6384', 'format': '.2f'},
+        'Alpha': {'col': 'Alpha', 'color': '#36A2EB', 'format': '.2f'},
         'Beta': {'col': 'Beta', 'color': '#4BC0C0', 'format': '.2f'},
         '夏普比率': {'col': '夏普比率', 'color': '#FF9F40', 'format': '.2f'},
         '最大回撤 (%)': {'col': '最大回撤 (%)', 'color': '#FF5733', 'format': '.2f'},
@@ -1440,8 +1430,11 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
     fig, axes = plt.subplots(2, 4, figsize=(24, 12))
     axes = axes.flatten()
     
-    # 排序ETF：按年化報酬率降序
-    df_sorted = df_results.sort_values('年化報酬率 (%)', ascending=False)
+    # 決定要排序的列名
+    sort_col = '年化報酬率 (%)' if annualize else '績效 (%)'
+    
+    # 排序ETF：按報酬率降序
+    df_sorted = df_results.sort_values(sort_col, ascending=False)
     
     tickers = df_sorted['證券代碼'].str.strip().values
     names = df_sorted['名稱'].str.strip().values
@@ -1521,7 +1514,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix=""):
     plt.close()
 
 
-def plot_performance_comparison(df_results, etf_type_prefix=""):
+def plot_performance_comparison(df_results, etf_type_prefix="", annualize=True):
     """繪製績效比較柱狀圖 - 自動根據 ETF 類型生成 _TW 或 _US 版本"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
@@ -1535,7 +1528,7 @@ def plot_performance_comparison(df_results, etf_type_prefix=""):
     for _, row in df_results.iterrows():
         name = row['名稱'].strip()
         ticker = row['證券代碼'].strip()
-        ret = float(row['年化報酬率 (%)'])
+        ret = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')))
         
         # 分類邏輯：美股 vs 台股
         # 美股相關 ETF：00646、00662、00757、00983A（ARK創新）、00988A（統一全球創新）、00989A（摩根美國科技）
@@ -1550,32 +1543,79 @@ def plot_performance_comparison(df_results, etf_type_prefix=""):
     print("  📥 下載基準指數...")
     benchmark_data = {}
     
+    # 決定基準指數的時間範圍和計算方式
+    # 對於 active_etf，統一使用 common_start_date（從 2025-07-22 開始），計算實績
+    # 對於其他類別，使用更長期的數據（1年），計算年化
+    if config_type == 'active_etf':
+        bench_start_date = common_start_date  # 統一使用 2025-07-22
+        bench_annualize = False  # 計算實績，不年化
+        print(f"  📊 基準指數時間範圍: {bench_start_date} 至 {latest_date}（與主動式 ETF 統一，計算實績）")
+    else:
+        from datetime import datetime as dt_now
+        latest_dt = dt_now.strptime(latest_date, '%Y-%m-%d')
+        benchmark_start_dt = latest_dt - timedelta(days=365)
+        bench_start_date = benchmark_start_dt.strftime('%Y-%m-%d')
+        bench_annualize = True  # 計算年化
+        print(f"  📊 基準指數時間範圍: {bench_start_date} 至 {latest_date}（過去1年，計算年化）")
+    
     try:
         # 台股基準
-        benchmark_0050 = yf.download('0050.TW', start=common_start_date, end=latest_date, progress=False)
-        benchmark_006208 = yf.download('006208.TW', start=common_start_date, end=latest_date, progress=False)
+        benchmark_0050 = download_price_data('0050.TW', start_date=bench_start_date, end_date=latest_date)
+        benchmark_006208 = download_price_data('006208.TW', start_date=bench_start_date, end_date=latest_date)
         
         if isinstance(benchmark_0050, pd.DataFrame) and not benchmark_0050.empty:
-            ret_0050 = float(((benchmark_0050['Close'].iloc[-1] / benchmark_0050['Close'].iloc[0]) ** (252 / len(benchmark_0050)) - 1) * 100)
-            benchmark_data['0050'] = ('0050 台灣50', ret_0050)
+            years_0050 = len(benchmark_0050['Close']) / 252
+            total_ret_0050 = ((benchmark_0050['Close'].iloc[-1] / benchmark_0050['Close'].iloc[0]) - 1) * 100
+            
+            if bench_annualize and years_0050 >= 1.0:
+                ret_0050 = float(((1 + total_ret_0050/100) ** (1 / years_0050) - 1) * 100) if years_0050 > 0 else total_ret_0050
+                benchmark_data['0050'] = ('0050 台灣50', ret_0050)
+            else:
+                ret_0050 = float(total_ret_0050)
+                benchmark_data['0050'] = ('0050 台灣50', ret_0050)
         
         if isinstance(benchmark_006208, pd.DataFrame) and not benchmark_006208.empty:
-            ret_006208 = float(((benchmark_006208['Close'].iloc[-1] / benchmark_006208['Close'].iloc[0]) ** (252 / len(benchmark_006208)) - 1) * 100)
-            benchmark_data['006208'] = ('006208 富邦台50', ret_006208)
+            years_006208 = len(benchmark_006208['Close']) / 252
+            total_ret_006208 = ((benchmark_006208['Close'].iloc[-1] / benchmark_006208['Close'].iloc[0]) - 1) * 100
+            
+            if bench_annualize and years_006208 >= 1.0:
+                ret_006208 = float(((1 + total_ret_006208/100) ** (1 / years_006208) - 1) * 100) if years_006208 > 0 else total_ret_006208
+                benchmark_data['006208'] = ('006208 富邦台50', ret_006208)
+            else:
+                ret_006208 = float(total_ret_006208)
+                benchmark_data['006208'] = ('006208 富邦台50', ret_006208)
         
-        # 美股基準
+        # 美股基準（也使用相同時間範圍和計算方式）
         if us_etfs:
-            voo = yf.download('VOO', start=common_start_date, end=latest_date, progress=False)
-            sp500 = yf.download('^GSPC', start=common_start_date, end=latest_date, progress=False)
+            voo = download_price_data('VOO', start_date=bench_start_date, end_date=latest_date)
+            sp500 = download_price_data('^GSPC', start_date=bench_start_date, end_date=latest_date)
             
             if isinstance(voo, pd.DataFrame) and not voo.empty:
-                ret_voo = float(((voo['Close'].iloc[-1] / voo['Close'].iloc[0]) ** (252 / len(voo)) - 1) * 100)
+                years_voo = len(voo['Close']) / 252
+                total_ret_voo = ((voo['Close'].iloc[-1] / voo['Close'].iloc[0]) - 1) * 100
+                
+                if bench_annualize and years_voo >= 1.0:
+                    ret_voo = float(((1 + total_ret_voo/100) ** (1 / years_voo) - 1) * 100) if years_voo > 0 else total_ret_voo
+                else:
+                    ret_voo = float(total_ret_voo)
                 benchmark_data['VOO'] = ('VOO S&P500', ret_voo)
             elif isinstance(sp500, pd.DataFrame) and not sp500.empty:
-                ret_sp500 = float(((sp500['Close'].iloc[-1] / sp500['Close'].iloc[0]) ** (252 / len(sp500)) - 1) * 100)
+                years_sp500 = len(sp500['Close']) / 252
+                total_ret_sp500 = ((sp500['Close'].iloc[-1] / sp500['Close'].iloc[0]) - 1) * 100
+                
+                if bench_annualize and years_sp500 >= 1.0:
+                    ret_sp500 = float(((1 + total_ret_sp500/100) ** (1 / years_sp500) - 1) * 100) if years_sp500 > 0 else total_ret_sp500
+                else:
+                    ret_sp500 = float(total_ret_sp500)
                 benchmark_data['SP500'] = ('^GSPC S&P500', ret_sp500)
     except Exception as e:
         print(f"  ⚠️  基準下載失敗: {e}")
+    
+    # 調試：打印基準指數數據
+    bench_label = "實績" if not bench_annualize else "年化報酬率"
+    print(f"\n📊 基準指數{bench_label}:")
+    for key, (name, ret) in benchmark_data.items():
+        print(f"  {name}: {ret:.2f}%")
     
     # 計算Y軸範圍（包含基準數據）
     all_returns_for_scale = [item[1] for item in taiwan_etfs + us_etfs]
@@ -1785,46 +1825,58 @@ def plot_performance_comparison(df_results, etf_type_prefix=""):
 
 
 if __name__ == '__main__':
+    print(f"\n🚀 開始執行 {config_type} 配置...")
+    
     # 首先設定 matplotlib 後端
+    print("  📊 設定 matplotlib 後端...")
     plt = setup_matplotlib_backend()
 
     # 1. 找出統一的比較期間
+    print("  📅 查找統一比較期間...")
     # 主動式 ETF 使用固定的 7/22 起始日期，其他配置使用最晚上市日期
     use_fixed_start = (config_type == 'active_etf')
     common_start_date = find_common_start_date(etf_list, start_date_3y, latest_date, use_fixed_start=use_fixed_start)
     
     # 2. 下載0050作為基準（用於計算追蹤誤差）
     print(f"\n下載基準指數 0050...")
+    benchmark_returns = None
+    sp500_returns = None
     try:
         # 台股基準
-        benchmark_df = yf.download('0050.TW,006208.TW,0056.TW,00878.TW', start=common_start_date, end=latest_date)
+        benchmark_df = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date)
         if not benchmark_df.empty:
             benchmark_prices = benchmark_df['Close']
             if isinstance(benchmark_prices, pd.DataFrame):
                 benchmark_prices = benchmark_prices.iloc[:, 0]
             benchmark_returns = benchmark_prices.pct_change().dropna()
-            print(f"基準資料期間: {len(benchmark_returns)} 個交易日")
+            print(f"✅ 基準資料期間: {len(benchmark_returns)} 個交易日")
         else:
+            print(f"⚠️  0050 無資料，Alpha/Beta 將無法計算")
             benchmark_returns = None
         
         # 美股基準 - S&P 500（用於視覺化比較）
-        sp500_df = yf.download('^GSPC', start=common_start_date, end=latest_date, progress=False)
+        sp500_df = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date)
         if not sp500_df.empty:
             sp500_prices = sp500_df['Close']
             if isinstance(sp500_prices, pd.DataFrame):
                 sp500_prices = sp500_prices.iloc[:, 0]
             sp500_returns = sp500_prices.pct_change().dropna()
-            print(f"美股基準資料期間: {len(sp500_returns)} 個交易日")
+            print(f"✅ 美股基準資料期間: {len(sp500_returns)} 個交易日")
         else:
+            print(f"⚠️  S&P500 無資料")
             sp500_returns = None
-    except:
-        print(f"基準指數下載失敗: {e}")
+    except Exception as e:
+        print(f"⚠️  基準指數下載異常: {e}，Alpha/Beta 將無法計算")
         benchmark_returns = None
         sp500_returns = None
     
     # 3. 分析所有ETF
     print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
     results = []
+    
+    # 對於 active_etf，不進行年化；其他類型進行年化
+    should_annualize = (config_type != 'active_etf')
+    
     for item in etf_list:
         # 支持對象和數組格式
         if isinstance(item, dict):
@@ -1835,7 +1887,7 @@ if __name__ == '__main__':
         if not ticker:
             continue
         # 忽略可選的第3個元素（分類信息）
-        data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate)
+        data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate, annualize=should_annualize)
         if data:
             results.append(data)
     
@@ -1843,8 +1895,10 @@ if __name__ == '__main__':
     if results:
         df_results = pd.DataFrame(results)
         
-        # 按年化報酬率排序
-        df_results = df_results.sort_values('年化報酬率 (%)', ascending=False)
+        # 按績效/年化報酬率排序
+        sort_column = '年化報酬率 (%)' if should_annualize else '績效 (%)'
+        if sort_column in df_results.columns:
+            df_results = df_results.sort_values(sort_column, ascending=False)
         
         print(f"\n{'='*180}")
         print(f"ETF 比較分析結果（統一期間: {common_start_date} 至 {latest_date}）")
@@ -1870,7 +1924,7 @@ if __name__ == '__main__':
             ticker = row['證券代碼']
             name = row['名稱'][:18] + '..' if len(row['名稱']) > 20 else row['名稱']  # 限制名稱長度
             period = format_value(row['資料期間 (年)'], 2)
-            annual_return = format_value(row['年化報酬率 (%)'], 2)
+            annual_return = format_value(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')), 2)
             sharpe = format_value(row['夏普比率'], 2)
             volatility = format_value(row['年化波動率 (%)'], 2)
             max_dd = format_value(row['最大回撤 (%)'], 2)
@@ -1894,12 +1948,44 @@ if __name__ == '__main__':
         print(f"共分析 {len(results)} 支ETF")
         print(f"統一比較期間: {df_results['資料期間 (年)'].iloc[0]:.2f} 年")
         
-        # 計算數值型欄位的平均值
-        numeric_returns = [x for x in df_results['年化報酬率 (%)'] if x != 'N/A']
+        # 打印數據天數摘要
+        print(f"\n📊 ETF 數據天數統計:")
+        print(f"{'代碼':<12} {'名稱':<20} {'數據天數':<10} {'說明':<50}")
+        print("-" * 92)
+        
+        data_days_dict = {}  # 記錄所有 ETF 的數據天數
+        for _, row in df_results.iterrows():
+            ticker = row['證券代碼']
+            name = row['名稱'][:18] if len(row['名稱']) > 18 else row['名稱']
+            days = int(row['數據天數'])
+            
+            # 判斷數據是否充分
+            if days < 20:
+                status = "❌ 數據嚴重不足，Alpha/Beta 不可靠"
+            elif days < 30:
+                status = "⚠️  數據不足，Alpha/Beta 可能不可靠"
+            elif days < 60:
+                status = "△ 數據有限，Alpha/Beta 需謹慎解讀"
+            else:
+                status = "✅ 數據充分，Alpha/Beta 可信"
+            
+            print(f"{ticker:<12} {name:<20} {days:<10} {status:<50}")
+            data_days_dict[ticker] = days
+        
+        print(f"\n📋 數據充分度分類 (>= 30 天可計算 Alpha/Beta):")
+        sufficient = sum(1 for d in data_days_dict.values() if d >= 30)
+        insufficient = len(data_days_dict) - sufficient
+        print(f"  ✅ 數據充分: {sufficient} 支")
+        print(f"  ⚠️  數據不足: {insufficient} 支")
+        
+        # 計算數值型欄位的平均值（使用正確的列名）
+        return_col = '年化報酬率 (%)' if should_annualize else '績效 (%)'
+        numeric_returns = [x for x in df_results[return_col] if x != 'N/A']
         numeric_volatility = [x for x in df_results['年化波動率 (%)'] if x != 'N/A']
         
+        return_label = '年化報酬率' if should_annualize else '績效'
         if numeric_returns:
-            print(f"平均年化報酬率: {np.mean(numeric_returns):.2f}%")
+            print(f"平均{return_label}: {np.mean(numeric_returns):.2f}%")
         if numeric_volatility:
             print(f"平均波動率: {np.mean(numeric_volatility):.2f}%")
             
@@ -1917,10 +2003,39 @@ if __name__ == '__main__':
         print("\n📊 正在生成視覺化圖表...")
         
         # 修正字體問題的視覺化
-        plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix)
-        plot_radar_chart(df_results, etf_type_prefix)
-        plot_multi_metrics_comparison(df_results, etf_type_prefix)  # 新增：多指標比較圖
-        plot_performance_comparison(df_results, etf_type_prefix)
+        skip_plots = os.getenv('SKIP_PLOTS', '0') == '1'
+        
+        if not skip_plots:
+            print("\n🎨 開始生成圖表...")
+            try:
+                print("  📈 1. 繪製價格趨勢圖...")
+                plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix)
+                print("  ✅ 價格趨勢圖完成")
+            except Exception as e:
+                print(f"  ❌ 價格趨勢圖失敗: {e}")
+            
+            try:
+                print("  📊 2. 繪製雷達圖...")
+                plot_radar_chart(df_results, etf_type_prefix)
+                print("  ✅ 雷達圖完成")
+            except Exception as e:
+                print(f"  ❌ 雷達圖失敗: {e}")
+            
+            try:
+                print("  📊 3. 繪製多指標比較圖...")
+                plot_multi_metrics_comparison(df_results, etf_type_prefix, annualize=should_annualize)
+                print("  ✅ 多指標比較圖完成")
+            except Exception as e:
+                print(f"  ❌ 多指標比較圖失敗: {e}")
+            
+            try:
+                print("  📊 4. 繪製績效比較圖...")
+                plot_performance_comparison(df_results, etf_type_prefix, annualize=should_annualize)
+                print("  ✅ 績效比較圖完成")
+            except Exception as e:
+                print(f"  ❌ 績效比較圖失敗: {e}")
+        else:
+            print("\n⏭️  跳過圖表生成（SKIP_PLOTS=1）")
         
         print("✅ ETF vs 基準比較圖已儲存為 etf_vs_benchmark_trend.png")
         print("✅ 雷達圖已儲存為 etf_radar_chart.png")

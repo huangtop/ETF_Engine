@@ -7,18 +7,78 @@
     "last_updated": "2025-12-23"
   },
   "etf_list": [
-    {"ticker": "00980A.TW", "name": "主動野村台灣優選", "type": "tw_active", "short_name": "野村優選"},
-    {"ticker": "00981A.TW", "name": "主動統一台股增長", "type": "tw_active", "short_name": "統一成長"},
-    {"ticker": "00982A.TW", "name": "主動群益台灣強棒", "type": "tw_active", "short_name": "群益強棒"},
-    {"ticker": "00983A.TW", "name": "主動中信ARK創新", "type": "us", "short_name": "ARK創新"},
-    {"ticker": "00985A.TW", "name": "主動野村台灣50", "type": "tw_active", "short_name": "台灣50"},
-    {"ticker": "00980D.TW", "name": "主動聯博投等入息", "type": "tw_active", "short_name": "聯博入息"},
-    {"ticker": "00984A.TW", "name": "主動安聯台灣高息", "type": "tw_active", "short_name": "安聯高息"},
-    {"ticker": "00991A.TW", "name": "主動復華未來50", "type": "tw_active", "short_name": "復華未來"},
-    {"ticker": "00992A.TW", "name": "主動群益台灣科技創新", "type": "tw_active", "short_name": "群益科技"},
-    {"ticker": "00986A.TW", "name": "主動台新龍頭成長", "type": "tw_active", "short_name": "台新龍頭"},
-    {"ticker": "00988A.TW", "name": "主動統一全球創新", "type": "us", "short_name": "全球創新"},
-    {"ticker": "00989A.TW", "name": "主動摩根美國科技", "type": "us", "short_name": "美國科技"}
+    {
+      "ticker": "00980A.TW",
+      "name": "主動野村台灣優選",
+      "type": "tw_active",
+      "short_name": "野村優選"
+    },
+    {
+      "ticker": "00981A.TW",
+      "name": "主動統一台股增長",
+      "type": "tw_active",
+      "short_name": "統一成長"
+    },
+    {
+      "ticker": "00982A.TW",
+      "name": "主動群益台灣強棒",
+      "type": "tw_active",
+      "short_name": "群益強棒"
+    },
+    {
+      "ticker": "00983A.TW",
+      "name": "主動中信ARK創新",
+      "type": "us",
+      "short_name": "ARK創新"
+    },
+    {
+      "ticker": "00985A.TW",
+      "name": "主動野村台灣50",
+      "type": "tw_active",
+      "short_name": "台灣50"
+    },
+    {
+      "ticker": "00980D.TW",
+      "name": "主動聯博投等入息",
+      "type": "tw_active",
+      "short_name": "聯博入息"
+    },
+    {
+      "ticker": "00984A.TW",
+      "name": "主動安聯台灣高息",
+      "type": "tw_active",
+      "short_name": "安聯高息"
+    },
+    {
+      "ticker": "00991A.TW",
+      "name": "主動復華未來50",
+      "type": "tw_active",
+      "short_name": "復華未來"
+    },
+    {
+      "ticker": "00992A.TW",
+      "name": "主動群益台灣科技創新",
+      "type": "tw_active",
+      "short_name": "群益科技"
+    },
+    {
+      "ticker": "00986A.TW",
+      "name": "主動台新龍頭成長",
+      "type": "tw_active",
+      "short_name": "台新龍頭"
+    },
+    {
+      "ticker": "00988A.TW",
+      "name": "主動統一全球創新",
+      "type": "us",
+      "short_name": "全球創新"
+    },
+    {
+      "ticker": "00989A.TW",
+      "name": "主動摩根美國科技",
+      "type": "us",
+      "short_name": "美國科技"
+    }
   ],
   "expense_ratio": {
     "00980A.TW": 0.785,
