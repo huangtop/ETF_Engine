@@ -299,27 +299,65 @@ def is_us_stock(ticker):
     return ticker.upper() in us_symbols or (not ticker.endswith('.TW') and not ticker.isdigit())
 
 
-def download_price_data(ticker, start_date, end_date, api_key=None):
+def download_price_data(ticker, start_date, end_date, api_key=None, config_type='default'):
     """
     統一的股價下載函數
     自動判斷是台股還是美股，使用對應的資料來源
+    包含智能快取機制，避免重複下載相同數據
     
     Args:
         ticker: 股票代碼
         start_date: 起始日期 (YYYY-MM-DD)
         end_date: 結束日期 (YYYY-MM-DD)
         api_key: Alpha Vantage API key（選擇性）
+        config_type: 配置類型（用於分離不同配置的快取）
     
     Returns:
         pd.DataFrame: OHLCV 資料
     """
     
+    # CSV 快取邏輯 - 按配置類型和日期範圍分開儲存
+    from pathlib import Path
+    cache_dir = Path('price_cache') / config_type
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 快取檔名包含股票代碼和日期範圍
+    cache_filename = f"{ticker}_{start_date}_to_{end_date}.csv"
+    cache_file = cache_dir / cache_filename
+    
+    # 檢查今日是否已有快取（同一天測試用同一份資料）
+    if cache_file.exists():
+        try:
+            # 檢查檔案修改時間是否為今天
+            file_mtime = datetime.fromtimestamp(cache_file.stat().st_mtime)
+            today = datetime.now().date()
+            
+            if file_mtime.date() == today:
+                df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+                print(f"  📦 使用今日快取: {ticker} ({len(df)} 天)")
+                return df
+            else:
+                print(f"  🔄 快取過期 ({file_mtime.date()} != {today})，重新下載...")
+        except Exception as e:
+            print(f"  ⚠️  快取讀取失敗: {e}，重新下載...")
+    
+    # 快取不存在或過期，重新下載
     if is_us_stock(ticker):
         # 美股或指數 → Alpha Vantage
-        return fetch_us_stock_price(ticker, start_date, end_date, api_key)
+        df = fetch_us_stock_price(ticker, start_date, end_date, api_key)
     else:
         # 台股 → TWSE
-        return fetch_twse_price(ticker, start_date, end_date)
+        df = fetch_twse_price(ticker, start_date, end_date)
+    
+    # 保存到快取（只有成功下載才快取）
+    if df is not None and not df.empty:
+        try:
+            df.to_csv(cache_file)
+            print(f"  💾 已快取: {ticker} → {cache_file}")
+        except Exception as e:
+            print(f"  ⚠️  快取保存失敗: {e}")
+    
+    return df if df is not None else pd.DataFrame()
 
 
 def set_alpha_vantage_key(api_key):

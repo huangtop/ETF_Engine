@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-在所有图表标题中添加时间戳
-"""
 import re
 from datetime import datetime
 

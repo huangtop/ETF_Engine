@@ -7,29 +7,154 @@
     "last_updated": "2025-12-23"
   },
   "etf_list": [
-    {"ticker": "00891.TW", "name": "中信關鍵半導體", "type": "industry", "short_name": "關鍵半導體"},
-    {"ticker": "00892.TW", "name": "富邦台灣半導體", "type": "industry", "short_name": "台灣半導體"},
-    {"ticker": "00927.TW", "name": "群益半導體收益", "type": "industry", "short_name": "半導體收益"},
-    {"ticker": "00947.TW", "name": "台新臺灣 IC 設計動能", "type": "industry", "short_name": "IC設計"},
-    {"ticker": "00904.TW", "name": "新光臺灣半導體", "type": "industry", "short_name": "台灣半導體"},
-    {"ticker": "00941.TW", "name": "中信上游半導體", "type": "industry", "short_name": "上游半導體"},
-    {"ticker": "00757.TW", "name": "統一 FANG＋", "type": "us", "short_name": "FANG+"},
-    {"ticker": "0052.TW", "name": "富邦台灣科技", "type": "industry", "short_name": "台灣科技"},
-    {"ticker": "00881.TW", "name": "國泰台灣 5G+", "type": "industry", "short_name": "5G+"},
-    {"ticker": "00935.TW", "name": "野村台灣創新科技 50", "type": "industry", "short_name": "創新科技"},
-    {"ticker": "00861.TW", "name": "元大全球未來通訊", "type": "us", "short_name": "未來通訊"},
-    {"ticker": "00896.TW", "name": "中信綠能及電動車", "type": "industry", "short_name": "綠能電車"},
-    {"ticker": "00893.TW", "name": "國泰全球智能電動車", "type": "us", "short_name": "智能電車"},
-    {"ticker": "00895.TW", "name": "富邦未來車", "type": "us", "short_name": "未來車"},
-    {"ticker": "00925.TW", "name": "新光標普電動車", "type": "us", "short_name": "電動車"},
-    {"ticker": "0055.TW", "name": "元大 MSCI 台灣金融", "type": "industry", "short_name": "台灣金融"},
-    {"ticker": "00921.TW", "name": "兆豐龍頭等權重", "type": "industry", "short_name": "龍頭等權"},
-    {"ticker": "00937B.TW", "name": "群益 ESG 投等債 20+", "type": "industry", "short_name": "ESG投等債"}
+    {
+      "ticker": "00891.TW",
+      "name": "中信關鍵半導體",
+      "type": "industry",
+      "short_name": "中信關鍵半導體",
+      "dividend_yield": 0.0
+    },
+    {
+      "ticker": "00892.TW",
+      "name": "富邦台灣半導體",
+      "type": "industry",
+      "short_name": "富邦台灣半導體"
+    },
+    {
+      "ticker": "00927.TW",
+      "name": "群益半導體收益",
+      "type": "industry",
+      "short_name": "群益半導體收益"
+    },
+    {
+      "ticker": "00947.TW",
+      "name": "台新臺灣 IC 設計動能",
+      "type": "industry",
+      "short_name": "台新IC設計"
+    },
+    {
+      "ticker": "00904.TW",
+      "name": "新光臺灣半導體",
+      "type": "industry",
+      "short_name": "新光台灣半導體"
+    },
+    {
+      "ticker": "00941.TW",
+      "name": "中信上游半導體",
+      "type": "industry",
+      "short_name": "中信上游半導體"
+    },
+    {
+      "ticker": "00757.TW",
+      "name": "統一FANG＋",
+      "type": "us",
+      "short_name": "統一FANG+"
+    },
+    {
+      "ticker": "0052.TW",
+      "name": "富邦台灣科技",
+      "type": "industry",
+      "short_name": "富邦台灣科技"
+    },
+    {
+      "ticker": "00881.TW",
+      "name": "國泰台灣 5G+",
+      "type": "industry",
+      "short_name": "國泰5G+"
+    },
+    {
+      "ticker": "00935.TW",
+      "name": "野村台灣創新科技 50",
+      "type": "industry",
+      "short_name": "野村創新科技"
+    },
+    {
+      "ticker": "00861.TW",
+      "name": "元大全球未來通訊",
+      "type": "us",
+      "short_name": "元大未來通訊"
+    },
+    {
+      "ticker": "00896.TW",
+      "name": "中信綠能及電動車",
+      "type": "industry",
+      "short_name": "中信綠能電車"
+    },
+    {
+      "ticker": "00893.TW",
+      "name": "國泰全球智能電動車",
+      "type": "us",
+      "short_name": "國泰智能電車"
+    },
+    {
+      "ticker": "00895.TW",
+      "name": "富邦未來車",
+      "type": "us",
+      "short_name": "富邦未來車"
+    },
+    {
+      "ticker": "00925.TW",
+      "name": "新光標普電動車",
+      "type": "us",
+      "short_name": "新光標普電動車"
+    },
+    {
+      "ticker": "0055.TW",
+      "name": "元大 MSCI 台灣金融",
+      "type": "industry",
+      "short_name": "台灣金融"
+    },
+    {
+      "ticker": "00921.TW",
+      "name": "兆豐龍頭等權重",
+      "type": "industry",
+      "short_name": "兆豐龍頭等權"
+    },
+    {
+      "ticker": "00937B.TW",
+      "name": "群益ESG投等債 20+",
+      "type": "industry",
+      "short_name": "群益ESG投等債"
+    }
   ],
   "expense_ratio": {
-    "00891.TW": 0.67, "00892.TW": 0.65, "00927.TW": 0.80, "00947.TW": 0.78, "00904.TW": 0.75,
-    "00941.TW": 0.72, "00757.TW": 1.15, "0052.TW": 0.20, "00881.TW": 0.81, "00935.TW": 0.85,
-    "00861.TW": 0.76, "00896.TW": 0.77, "00893.TW": 0.73, "00895.TW": 0.74, "00925.TW": 0.68,
-    "0055.TW": 0.30, "00921.TW": 0.69, "00937B.TW": 0.85
+    "00891.TW": 0.67,
+    "00892.TW": 0.65,
+    "00927.TW": 0.8,
+    "00947.TW": 0.78,
+    "00904.TW": 0.75,
+    "00941.TW": 0.72,
+    "00757.TW": 1.15,
+    "0052.TW": 0.2,
+    "00881.TW": 0.81,
+    "00935.TW": 0.85,
+    "00861.TW": 0.76,
+    "00896.TW": 0.77,
+    "00893.TW": 0.73,
+    "00895.TW": 0.74,
+    "00925.TW": 0.68,
+    "0055.TW": 0.3,
+    "00921.TW": 0.69,
+    "00937B.TW": 0.85
+  },
+  "devidend": {
+    "00891.TW": "N/A",
+    "00892.TW": "N/A",
+    "00927.TW": "N/A",
+    "00947.TW": "N/A",
+    "00904.TW": "N/A",
+    "00941.TW": "N/A",
+    "00757.TW": "N/A",
+    "0052.TW": "N/A",
+    "00881.TW": "N/A",
+    "00935.TW": "N/A",
+    "00861.TW": "N/A",
+    "00896.TW": "N/A",
+    "00893.TW": "N/A",
+    "00895.TW": "N/A",
+    "00925.TW": "N/A",
+    "0055.TW": "N/A",
+    "00921.TW": "N/A",
+    "00937B.TW": "N/A"
   }
 }

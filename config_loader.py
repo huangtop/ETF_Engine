@@ -179,16 +179,6 @@ class ETFConfigLoader:
 
 # 便捷函数
 def load_etf_config(config_name: str, config_dir: str = 'etf_configs') -> Dict:
-    """
-    简便函数：加载单个配置文件
-    
-    Args:
-        config_name: 配置文件名称（不含 .json）
-        config_dir: 配置目录
-        
-    Returns:
-        配置字典
-    """
     loader = ETFConfigLoader(config_dir)
     config = loader.load_config(config_name)
     is_valid, errors = loader.validate_config(config)
@@ -200,15 +190,5 @@ def load_etf_config(config_name: str, config_dir: str = 'etf_configs') -> Dict:
 
 
 def load_multiple_etf_configs(config_names: List[str], config_dir: str = 'etf_configs') -> Dict:
-    """
-    简便函数：加载并合并多个配置文件
-    
-    Args:
-        config_names: 配置文件名称列表
-        config_dir: 配置目录
-        
-    Returns:
-        合并后的配置字典
-    """
     loader = ETFConfigLoader(config_dir)
     return loader.load_multiple_configs(config_names)
