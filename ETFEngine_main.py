@@ -568,7 +568,8 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         print(f"  📊 {clean_ticker} 換手率: {turnover}%")
         print(f"  💰 {clean_ticker} 管理費: {expense}%")
 
-        print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr:.2%}")
+        cagr_pct = cagr * 100 if not pd.isna(cagr) else 0
+        print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr_pct:.2f}%")
         
         # 計算 Alpha 和 Beta
         alpha, beta = np.nan, np.nan
@@ -599,8 +600,8 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '數據天數': len(df),  # 統一期間的資料天數
             '完整歷史天數': len(df_full) if not df_full.empty else 0,  # 完整歷史資料天數
             '資料期間 (年)': round(data_years, 2),
-            '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
-            '3年年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 'N/A',  # 3年年化報酬率
+            '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 9999,
+            '3年年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 9999,  # 3年年化報酬率
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
             'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
             '夏普比率': round(sharpe, 2) if not pd.isna(sharpe) else 'N/A',
@@ -1593,8 +1594,8 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     plt.close()
 
 
-def plot_dual_column_performance(df_results, etf_type_prefix=""):
-    """繪製雙柱狀圖表：1年年化報酬率 vs 3年年化報酬率（業界標準）"""
+def plot_dual_column_performance(df_results, benchmark_data=None, etf_type_prefix=""):
+    """繪製雙柱狀圖表：ETF 1年年化報酬率 vs 基準指數年化報酬率"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
     
@@ -1605,32 +1606,44 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
         
         # 準備數據
         names = []
-        ret_1y_list = []
-        ret_3y_list = []
+        ret_etf_list = []  # ETF 1年年化報酬率
+        ret_bench_list = []  # 基準報酬率
         
+        # 決定用哪個基準（台股或美股）
+        benchmark_key = '0050'  # 默認用台灣50
+        if etf_type_prefix.startswith('HighDividend'):
+            benchmark_key = '0050'  # 高股息 ETF 用台灣50
+        elif etf_type_prefix.startswith('US'):
+            benchmark_key = 'VOO'  # 美股 ETF 用 VOO
+        
+        # 獲取基準報酬率
+        bench_ret = 0
+        bench_name = '基準'
+        if benchmark_data and benchmark_key in benchmark_data:
+            bench_name, bench_ret = benchmark_data[benchmark_key]
+        
+        # 準備 ETF 數據
         for _, row in df_results.iterrows():
             ticker = row['證券代碼'].strip()
             name = row['名稱'].strip()
             
-            # 1 年報酬率
-            ret_1y = row.get('1年年化報酬率 (%)', 'N/A')
-            ret_1y = float(ret_1y) if ret_1y != 'N/A' else None
-            
-            # 3 年報酬率（用年化報酬率欄位）
-            ret_3y = row.get('3年年化報酬率 (%)', 'N/A')
-            ret_3y = float(ret_3y) if ret_3y != 'N/A' else None
+            # 用 1 年年化報酬率
+            ret_etf = row.get('1年年化報酬率 (%)', 'N/A')
+            ret_etf = float(ret_etf) if ret_etf != 'N/A' else 0
             
             names.append(f"{ticker}\n{name}")
-            ret_1y_list.append(ret_1y if ret_1y is not None else 0)
-            ret_3y_list.append(ret_3y if ret_3y is not None else 0)
+            ret_etf_list.append(ret_etf)
+            ret_bench_list.append(bench_ret)
         
         # 設定 X 軸位置
         x = np.arange(len(names))
         width = 0.35
         
         # 繪製雙柱
-        bars1 = ax.bar(x - width/2, ret_1y_list, width, label='1年年化報酬率', color='#3498db', alpha=0.8, edgecolor='black', linewidth=1)
-        bars2 = ax.bar(x + width/2, ret_3y_list, width, label='3年年化報酬率', color='#e74c3c', alpha=0.8, edgecolor='black', linewidth=1)
+        bars1 = ax.bar(x - width/2, ret_etf_list, width, label='ETF 1年年化報酬率', 
+                       color='#3498db', alpha=0.8, edgecolor='black', linewidth=1)
+        bars2 = ax.bar(x + width/2, ret_bench_list, width, label=f'{bench_name} 年化報酬率', 
+                       color='#e74c3c', alpha=0.8, edgecolor='black', linewidth=1)
         
         # 添加數值標籤
         for bar in bars1:
@@ -1638,7 +1651,6 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
             if height != 0:
                 ax.text(bar.get_x() + bar.get_width()/2., height,
                        f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
-        
         for bar in bars2:
             height = bar.get_height()
             if height != 0:
@@ -1647,8 +1659,8 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
         
         # 設定標籤
         ax.set_xlabel('ETF', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_title('ETF 績效對比：1年 vs 3年年化報酬率\n（紅色虛線表示無 3 年數據，顯示全部 ETF）', 
+        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_title(f'ETF 績效對比：vs {bench_name}\n（藍色：ETF | 紅色：基準指數）',
                     fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
@@ -1658,8 +1670,8 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
         ax.grid(True, alpha=0.3, axis='y')
         
         # 圖例
-        ax.legend(fontsize=FONT_SIZE_CONFIG['label_medium'], loc='upper right', frameon=True, fancybox=True, shadow=True)
-        
+        ax.legend(fontsize=FONT_SIZE_CONFIG['label_medium'], loc='upper right', 
+                 frameon=True, fancybox=True, shadow=True)
         plt.tight_layout()
         
         # 保存
@@ -2061,8 +2073,8 @@ if __name__ == '__main__':
         print(f"✅ 共分析 {len(df_results)} 支 ETF（其中 {etf_3y_count} 支滿足 3 年條件）")
         etf_filter_status = f"（共 {len(df_results)} 支，其中 {etf_3y_count} 支有 3 年數據）"
         
-        # 按績效/年化報酬率排序
-        sort_column = '3年年化報酬率 (%)' if should_annualize else '績效 (%)'
+        # 按1年年化報酬率排序（3年年化有 N/A，改為9999無法正確排序，所以用1年）
+        sort_column = '1年年化報酬率 (%)'  # 全部 ETF 都有1年數據
         if sort_column in df_results.columns:
             df_results = df_results.sort_values(sort_column, ascending=False)
         
@@ -2194,7 +2206,7 @@ if __name__ == '__main__':
             
             try:
                 print("  📊 4. 繪製雙柱狀績效圖表（1年 vs 3年）...")
-                plot_dual_column_performance(df_results, etf_type_prefix)
+                plot_dual_column_performance(df_results, benchmark_data, etf_type_prefix)
                 print("  ✅ 雙柱狀績效圖表完成")
             except Exception as e:
                 print(f"  ❌ 雙柱狀績效圖表失敗: {e}")
