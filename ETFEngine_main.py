@@ -230,6 +230,41 @@ def calculate_returns(prices, annualize=True):
         print(f"報酬率計算錯誤: {e}")
         return np.nan, np.nan
 
+
+def calculate_period_returns(prices, period_days=252):
+    """計算特定期間的年化報酬率
+    
+    Args:
+        prices: 價格序列
+        period_days: 期間天數（252=1年，756=3年）
+    
+    Returns:
+        (年化報酬率, 實際天數)
+    """
+    try:
+        if len(prices) < period_days:
+            return np.nan, len(prices)
+        
+        if isinstance(prices, pd.DataFrame):
+            prices = prices.iloc[:, 0]
+        
+        # 取最後 period_days 個交易日
+        period_prices = prices.iloc[-period_days:]
+        start_price = period_prices.iloc[0]
+        end_price = period_prices.iloc[-1]
+        
+        if isinstance(start_price, pd.Series):
+            start_price = start_price.iloc[0]
+        if isinstance(end_price, pd.Series):
+            end_price = end_price.iloc[0]
+        
+        years = len(period_prices) / 252
+        cagr = (end_price / start_price) ** (1 / years) - 1
+        
+        return cagr, len(period_prices)
+    except Exception as e:
+        return np.nan, np.nan
+
 def calculate_volatility(returns):
     """計算年化波動率"""
     if isinstance(returns, pd.DataFrame):
@@ -493,6 +528,10 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
 
         print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr:.2%}")
         
+        # 計算 1 年和 3 年的年化報酬率
+        ret_1y, days_1y = calculate_period_returns(prices, period_days=252)
+        ret_3y, days_3y = calculate_period_returns(prices, period_days=756)
+        
         # 計算 Alpha 和 Beta
         alpha, beta = np.nan, np.nan
         if benchmark_returns is not None and len(benchmark_returns) > 0:
@@ -519,9 +558,10 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         return {
             '證券代碼': clean_ticker,
             '名稱': etf_name,
-            '數據天數': len(df),  # 記錄實際的數據天數
+            '數據天數': len(df),
             '資料期間 (年)': round(data_years, 2),
-            '年化報酬率 (%)' if annualize else '績效 (%)': round(cagr*100, 2) if not pd.isna(cagr) else 'N/A',
+            '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
+            '年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 'N/A',  # 用3年數據作為主要報酬率
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
             'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
             '夏普比率': round(sharpe, 2) if not pd.isna(sharpe) else 'N/A',
@@ -1895,17 +1935,33 @@ if __name__ == '__main__':
     if results:
         df_results = pd.DataFrame(results)
         
+        # 過濾：只顯示滿 3 年以上的 ETF（符合業界標準）
+        print(f"\n📊 過濾成立不到 3 年的 ETF...")
+        min_days_3years = 756  # 3 年 = 756 個交易日
+        df_filtered = df_results[df_results['數據天數'] >= min_days_3years].copy()
+        
+        if len(df_filtered) == 0:
+            print(f"⚠️  沒有任何 ETF 的成立時間達到 3 年以上")
+            df_filtered = df_results  # 如果沒有 3 年+的 ETF，使用全部資料
+            etf_filter_status = "（無 3 年+的 ETF，顯示全部）"
+        else:
+            filtered_out = len(df_results) - len(df_filtered)
+            print(f"✅ 已過濾出滿 3 年的 ETF: {len(df_filtered)} 支（過濾掉 {filtered_out} 支新 ETF）")
+            etf_filter_status = f"（已過濾，僅顯示成立滿 3 年的 {len(df_filtered)} 支 ETF）"
+        
+        df_results = df_filtered
+        
         # 按績效/年化報酬率排序
         sort_column = '年化報酬率 (%)' if should_annualize else '績效 (%)'
         if sort_column in df_results.columns:
             df_results = df_results.sort_values(sort_column, ascending=False)
         
         print(f"\n{'='*180}")
-        print(f"ETF 比較分析結果（統一期間: {common_start_date} 至 {latest_date}）")
+        print(f"ETF 比較分析結果（統一期間: {common_start_date} 至 {latest_date}）{etf_filter_status}")
         print(f"{'='*180}")
 
         # 修正後的表格標題 - 單行不換行
-        print(f"{'證券代碼':<12} {'名稱':<20} {'期間(年)':<8} {'年化報酬率(%)':<12} {'夏普比率':<9} {'波動率(%)':<9} {'最大回撤(%)':<11} {'追蹤誤差(%)':<11} {'換手率(%)':<9} {'管理費(%)':<9} {'股息殖利率(%)':<12}")
+        print(f"{'證券代碼':<12} {'名稱':<20} {'期間(年)':<8} {'1年年化(%)':<12} {'3年年化(%)':<12} {'夏普比率':<9} {'波動率(%)':<9} {'最大回撤(%)':<11} {'追蹤誤差(%)':<11}")
         print('-' * 180)
 
         for _, row in df_results.iterrows():
@@ -1922,18 +1978,16 @@ if __name__ == '__main__':
             
             # 格式化各欄位
             ticker = row['證券代碼']
-            name = row['名稱'][:18] + '..' if len(row['名稱']) > 20 else row['名稱']  # 限制名稱長度
+            name = row['名稱'][:18] + '..' if len(row['名稱']) > 20 else row['名稱']
             period = format_value(row['資料期間 (年)'], 2)
+            ret_1y = format_value(row.get('1年年化報酬率 (%)', 'N/A'), 2)
             annual_return = format_value(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')), 2)
             sharpe = format_value(row['夏普比率'], 2)
             volatility = format_value(row['年化波動率 (%)'], 2)
             max_dd = format_value(row['最大回撤 (%)'], 2)
             tracking_error = format_value(row['追蹤誤差 (%)'], 2)
-            turnover = format_value(row['換手率 (%)'], 0)
-            expense = format_value(row['管理費 (%)'], 2)
-            dividend_yield = format_value(row['股息殖利率 (%)'], 1)
             
-            print(f"{ticker:<12} {name:<20} {period:<8} {annual_return:<12} {sharpe:<9} {volatility:<9} {max_dd:<11} {tracking_error:<11} {turnover:<9} {expense:<9} {dividend_yield:<12}")
+            print(f"{ticker:<12} {name:<20} {period:<8} {ret_1y:<12} {annual_return:<12} {sharpe:<9} {volatility:<9} {max_dd:<11} {tracking_error:<11}")
 
         print('-' * 180)
 
