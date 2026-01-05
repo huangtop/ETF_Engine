@@ -16,6 +16,10 @@ build/
 *~
 .DS_Store
 
+# 缓存文件夹
+price_cache/
+cache/
+
 # 输出文件夹
 Output_*/
 Output_Active_ETF/

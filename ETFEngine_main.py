@@ -63,12 +63,6 @@ def get_output_folder(config_type='active_etf'):
     return output_path
 
 
-# 初始化輸出資料夾
-output_folder = get_output_folder(config_type)
-
-
-
-
 def find_common_start_date(etf_list, initial_start_date, end_date, config_type='default', use_fixed_start=False):
     """找出所有ETF的最晚開始日期作為統一比較期間
     
@@ -564,6 +558,12 @@ if __name__ == '__main__':
     
     print(f"\n🚀 開始執行 {config_type} 配置...")
     
+    # 初始化輸出資料夾
+    output_folder = get_output_folder(config_type)
+    
+    # 導入繪圖函數
+    from generate_all_charts import plot_turnover_bar, plot_radar_chart, plot_price_trend
+    
     # 首先設定 matplotlib 後端
     print("  📊 設定 matplotlib 後端...")
     plt = setup_matplotlib_backend()
@@ -743,12 +743,32 @@ if __name__ == '__main__':
             
         print(f"{'='*60}")
 
-        # 5. 視覺化（暫時使用主程式內的函數，待重構）
-        turnover_chart = plot_turnover_bar(df_results)
-        print("\nChart.js 條形圖配置（換手率）：")
-        print(turnover_chart)
-        plot_price_trend({ticker: name for ticker, name in etf_list}, config, common_start_date, latest_date, etf_type_prefix)
-        plot_radar_chart(df_results)
+        # 5. 視覺化（修復參數傳入）
+        try:
+            turnover_chart = plot_turnover_bar(df_results)
+            print("\nChart.js 條形圖配置（換手率）：")
+            print(turnover_chart)
+            
+            # 正確解析 ETF 列表格式
+            etf_dict = {}
+            for item in etf_list:
+                if isinstance(item, dict):
+                    ticker = item.get('ticker', '')
+                    name = item.get('name', '')
+                else:
+                    ticker = item[0] if len(item) > 0 else ''
+                    name = item[1] if len(item) > 1 else ''
+                if ticker and name:
+                    etf_dict[ticker] = name
+            
+            # 現在傳入所有必要參數
+            plot_price_trend(etf_dict, config, common_start_date, latest_date, etf_type_prefix, output_folder)
+            plot_radar_chart(df_results, config, etf_type_prefix, output_folder)
+            print("\n✅ 圖表生成完成")
+        except Exception as e:
+            print(f"⚠️  圖表生成失敗: {e}")
+            import traceback
+            traceback.print_exc()
         print("\n折線圖已儲存為 etf_price_trend.png")
         print("雷達圖已儲存為 etf_radar_chart.png")
 

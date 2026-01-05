@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ETF 圖表批量生成腳本
-用於本地測試或手動生成所有 ETF 配置的分析圖表
+ETF 圖表生成模組
+包含所有繪圖函數，從主程式分離出來以便重用和維護
 """
 
 import os
 import sys
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 import shutil
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from math import pi
+from config_loader import load_etf_config
+from data_fetcher import download_price_data
 
 # Font size config
 FONT_SIZE_CONFIG = {
@@ -69,7 +72,7 @@ def plot_turnover_bar(df_results):
     }
 
 
-def plot_radar_chart(df_results, etf_type_prefix=""):
+def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder="."):
     """繪製多指標雷達圖（分類拆分，使用不同標記）
     
     Args:
@@ -97,7 +100,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     for _, row in df_results.iterrows():
         ticker = row['證券代碼'].strip()
         name = row['名稱'].strip()
-        etf_type = config.get('etf_type', {}).get(ticker)
+        etf_type = config.get('etf_type', {}).get(ticker) if config else None
         
         if etf_type == 'us':
             us_etfs.append(row)
@@ -719,7 +722,7 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         plt.close()
 
 
-def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix=""):
+def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix="", output_folder="."):
     """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）
     
     Args:
@@ -727,6 +730,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         config: ETF 配置
         common_start_date: 統一的起始日期
         latest_date: 結束日期
+        etf_type_prefix: ETF 類型前綴
+        output_folder: 輸出資料夾路徑
         etf_type_prefix: ETF 類型前綴（如 "Active_", "HighDividend_", "Industry_"）
     """
     plt = setup_matplotlib_backend()
@@ -778,7 +783,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         try:
             # 台股基準 - 改用台灣50(0050)以保持與trend_tw_stock.png一致
             print("正在下載台灣50基準指數...")
-            tw_index = download_price_data('0050.TW', start_date=start_date_3y, end_date=latest_date)
+            tw_index = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date)
             if not tw_index.empty:
                 tw_prices = tw_index['Close']
                 if isinstance(tw_prices, pd.DataFrame):
@@ -793,7 +798,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         try:
             # 美股基準 - S&P 500
             print("正在下載美股基準指數...")
-            sp500_index = download_price_data('^GSPC', start_date=start_date_3y, end_date=latest_date)
+            sp500_index = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date)
             if not sp500_index.empty:
                 sp500_prices = sp500_index['Close']
                 if isinstance(sp500_prices, pd.DataFrame):
@@ -806,9 +811,9 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             print(f"S&P 500指數下載失敗: {e}")
         
         # 繪製各ETF（較細的線條）
-        for i, (ticker, name) in enumerate(etf_info.items()):
+        for i, (ticker, name) in enumerate(etf_list.items()):
             try:
-                df = download_price_data(ticker.strip(), start_date=start_date_3y, end_date=latest_date)
+                df = download_price_data(ticker.strip(), start_date=common_start_date, end_date=latest_date)
                 if not df.empty:
                     prices = df['Close']
                     if isinstance(prices, pd.DataFrame):
@@ -821,8 +826,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     line_style = '-'
                     alpha = 0.7
                     
-                    # 使用短名稱
-                    short_name = row.get('短名稱', name.strip()).strip()
+                    # 使用簡化名稱
+                    short_name = name.strip()
                     display_name = f"{ticker.replace('.TW', '')} {short_name}"
                     
                     plt.plot(normalized_prices.index, normalized_prices, 
@@ -1042,9 +1047,20 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         plt.close()
     
     # 執行繪製
+    # 從 etf_type_prefix 推斷配置類型
+    if etf_type_prefix == 'Active_':
+        config_type = 'active_etf'
+    elif etf_type_prefix == 'HighDividend_':
+        config_type = 'high_dividend_etf'
+    elif etf_type_prefix == 'Industry_':
+        config_type = 'industry_etf'
+    else:
+        config_type = 'default'
+    
     # 判斷是否為主動式 ETF（使用固定起始日期）
     use_fixed_start_for_trends = (config_type == 'active_etf')
-    fixed_start_date_for_trends = start_date_3y if use_fixed_start_for_trends else None
+    # 使用傳入的日期參數而不是未定義的變數
+    fixed_start_date_for_trends = common_start_date if use_fixed_start_for_trends else None
     
     # 總覽圖
     plot_overview()
