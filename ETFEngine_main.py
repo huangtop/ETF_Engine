@@ -2054,21 +2054,12 @@ if __name__ == '__main__':
     if results:
         df_results = pd.DataFrame(results)
         
-        # 過濾：只顯示滿 3 年以上的 ETF（符合業界標準）
-        print(f"\n📊 過濾成立不到 3 年的 ETF...")
+        # 不過濾 ETF - 全部顯示，1 年柱狀全部有，3 年柱狀只有成立滿 3 年的才有
+        print(f"\n📊 分析完成")
         min_days_3years = 756  # 3 年 = 756 個交易日
-        df_filtered = df_results[df_results['完整歷史天數'] >= min_days_3years].copy()
-        
-        if len(df_filtered) == 0:
-            print(f"⚠️  沒有任何 ETF 的完整歷史達到 3 年以上")
-            df_filtered = df_results  # 如果沒有 3 年+的 ETF，使用全部資料
-            etf_filter_status = "（無 3 年+的 ETF，顯示全部）"
-        else:
-            filtered_out = len(df_results) - len(df_filtered)
-            print(f"✅ 已過濾出滿 3 年的 ETF: {len(df_filtered)} 支（過濾掉 {filtered_out} 支新 ETF）")
-            etf_filter_status = f"（已過濾，僅顯示成立滿 3 年的 {len(df_filtered)} 支 ETF）"
-        
-        df_results = df_filtered
+        etf_3y_count = len(df_results[df_results['完整歷史天數'] >= min_days_3years])
+        print(f"✅ 共分析 {len(df_results)} 支 ETF（其中 {etf_3y_count} 支滿足 3 年條件）")
+        etf_filter_status = f"（共 {len(df_results)} 支，其中 {etf_3y_count} 支有 3 年數據）"
         
         # 按績效/年化報酬率排序
         sort_column = '3年年化報酬率 (%)' if should_annualize else '績效 (%)'
