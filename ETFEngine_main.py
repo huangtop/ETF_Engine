@@ -1488,8 +1488,8 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     
     # 決定績效列的名稱
     if annualize:
-        return_col = '3年年化報酬率 (%)'
-        return_label = '3年年化報酬率 (%)'
+        return_col = '1年年化報酬率 (%)'
+        return_label = '1年年化報酬率 (%)'
     else:
         return_col = '績效 (%)'
         return_label = '績效 (%)'
@@ -1511,7 +1511,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     axes = axes.flatten()
     
     # 決定要排序的列名
-    sort_col = '3年年化報酬率 (%)' if annualize else '績效 (%)'
+    sort_col = '1年年化報酬率 (%)' if annualize else '績效 (%)'
     
     # 排序ETF：按報酬率降序
     df_sorted = df_results.sort_values(sort_col, ascending=False)
@@ -1610,57 +1610,77 @@ def plot_dual_column_performance(df_results, benchmark_data=None, etf_type_prefi
         ret_bench_list = []  # 基準報酬率
         
         # 決定用哪個基準（台股或美股）
-        benchmark_key = '0050'  # 默認用台灣50
+        benchmark_key_1y = '0050'  # 1年基準
+        benchmark_key_3y = '0050'  # 3年基準
         if etf_type_prefix.startswith('HighDividend'):
-            benchmark_key = '0050'  # 高股息 ETF 用台灣50
+            benchmark_key_1y = '0050'
+            benchmark_key_3y = '0050'
         elif etf_type_prefix.startswith('US'):
-            benchmark_key = 'VOO'  # 美股 ETF 用 VOO
+            benchmark_key_1y = 'VOO'
+            benchmark_key_3y = 'VOO'
         
         # 獲取基準報酬率
-        bench_ret = 0
+        bench_ret_1y = 0
+        bench_ret_3y = 0
         bench_name = '基準'
-        if benchmark_data and benchmark_key in benchmark_data:
-            bench_name, bench_ret = benchmark_data[benchmark_key]
+        if benchmark_data and benchmark_key_1y in benchmark_data:
+            bench_name, bench_ret_1y = benchmark_data[benchmark_key_1y]
+        if benchmark_data and benchmark_key_3y in benchmark_data:
+            _, bench_ret_3y = benchmark_data[benchmark_key_3y]
         
         # 準備 ETF 數據
+        names = []
+        ret_etf_1y_list = []  # ETF 1年年化報酬率
+        ret_etf_3y_list = []  # ETF 3年年化報酬率
+        ret_bench_1y_list = []  # 基準 1年
+        ret_bench_3y_list = []  # 基準 3年
+        
         for _, row in df_results.iterrows():
             ticker = row['證券代碼'].strip()
             name = row['名稱'].strip()
             
-            # 用 1 年年化報酬率
-            ret_etf = row.get('1年年化報酬率 (%)', 'N/A')
-            ret_etf = float(ret_etf) if ret_etf != 'N/A' else 0
+            # 1 年年化報酬率
+            ret_1y = row.get('1年年化報酬率 (%)', 'N/A')
+            ret_1y = float(ret_1y) if ret_1y != 'N/A' and ret_1y != 9999 else 0
+            
+            # 3 年年化報酬率
+            ret_3y = row.get('3年年化報酬率 (%)', 'N/A')
+            ret_3y = float(ret_3y) if ret_3y != 'N/A' and ret_3y != 9999 else 0
             
             names.append(f"{ticker}\n{name}")
-            ret_etf_list.append(ret_etf)
-            ret_bench_list.append(bench_ret)
+            ret_etf_1y_list.append(ret_1y)
+            ret_etf_3y_list.append(ret_3y)
+            ret_bench_1y_list.append(bench_ret_1y)
+            ret_bench_3y_list.append(bench_ret_3y)
         
         # 設定 X 軸位置
         x = np.arange(len(names))
         width = 0.35
         
-        # 繪製雙柱
-        bars1 = ax.bar(x - width/2, ret_etf_list, width, label='ETF 1年年化報酬率', 
-                       color='#3498db', alpha=0.8, edgecolor='black', linewidth=1)
-        bars2 = ax.bar(x + width/2, ret_bench_list, width, label=f'{bench_name} 年化報酬率', 
-                       color='#e74c3c', alpha=0.8, edgecolor='black', linewidth=1)
+        # 繪製 4 根柱子
+        width = 0.2
+        offset = width * 1.5
+        
+        bars1 = ax.bar(x - offset, ret_etf_1y_list, width, label='ETF 1年年化', 
+                       color='#3498db', alpha=0.85, edgecolor='black', linewidth=1)
+        bars2 = ax.bar(x - width/2, ret_etf_3y_list, width, label='ETF 3年年化', 
+                       color='#f39c12', alpha=0.85, edgecolor='black', linewidth=1)
+        bars3 = ax.bar(x + width/2, ret_bench_1y_list, width, label=f'{bench_name} 1年', 
+                       color='#95a5a6', alpha=0.85, edgecolor='black', linewidth=1)
+        bars4 = ax.bar(x + offset, ret_bench_3y_list, width, label=f'{bench_name} 3年', 
+                       color='#52be80', alpha=0.85, edgecolor='black', linewidth=1)
         
         # 添加數值標籤
-        for bar in bars1:
+        for bar in bars1 + bars2 + bars3 + bars4:
             height = bar.get_height()
-            if height != 0:
+            if height != 0 and height != 0:
                 ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
-        for bar in bars2:
-            height = bar.get_height()
-            if height != 0:
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+                       f'{height:.1f}%', ha='center', va='bottom', fontsize=8, fontweight='bold')
         
         # 設定標籤
         ax.set_xlabel('ETF', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_title(f'ETF 績效對比：vs {bench_name}\n（藍色：ETF | 紅色：基準指數）',
+        ax.set_ylabel('年化報酬率 (% / 年)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_title(f'ETF 績效對比：1年 & 3年 vs {bench_name}\n（藍色：ETF 1年 | 黃色：ETF 3年 | 灰色：基準 1年 | 綠色：基準 3年）',
                     fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
@@ -2155,7 +2175,7 @@ if __name__ == '__main__':
         print(f"  ⚠️  數據不足: {insufficient} 支")
         
         # 計算數值型欄位的平均值（使用正確的列名）
-        return_col = '3年年化報酬率 (%)' if should_annualize else '績效 (%)'
+        return_col = '1年年化報酬率 (%)'
         numeric_returns = [x for x in df_results[return_col] if x != 'N/A']
         numeric_volatility = [x for x in df_results['年化波動率 (%)'] if x != 'N/A']
         
