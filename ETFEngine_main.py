@@ -570,10 +570,6 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
 
         print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr:.2%}")
         
-        # 計算 1 年和 3 年的年化報酬率
-        ret_1y, days_1y = calculate_period_returns(prices, period_days=252)
-        ret_3y, days_3y = calculate_period_returns(prices, period_days=756)
-        
         # 計算 Alpha 和 Beta
         alpha, beta = np.nan, np.nan
         if benchmark_returns is not None and len(benchmark_returns) > 0:
@@ -604,7 +600,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '完整歷史天數': len(df_full) if not df_full.empty else 0,  # 完整歷史資料天數
             '資料期間 (年)': round(data_years, 2),
             '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
-            '年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 'N/A',  # 用3年數據作為主要報酬率
+            '3年年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 'N/A',  # 3年年化報酬率
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
             'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
             '夏普比率': round(sharpe, 2) if not pd.isna(sharpe) else 'N/A',
@@ -732,8 +728,8 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     all_returns, all_sharpe, all_vol, all_dd, all_te = [], [], [], [], []
     
     for _, row in df_results.iterrows():
-        if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A':
-            all_returns.append(float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))))
+        if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A':
+            all_returns.append(float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))))
         if row['夏普比率'] != 'N/A':
             all_sharpe.append(float(row['夏普比率']))
         if row['年化波動率 (%)'] != 'N/A':
@@ -772,7 +768,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
             
             # 計算標準化數值
             values = []
-            ret_val = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
+            ret_val = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
             values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
             
             sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
@@ -955,7 +951,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
         
         # 計算標準化數值
         values = []
-        ret_val = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
+        ret_val = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
         values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
         
         sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
@@ -1033,7 +1029,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     # 計算冠軍
     metrics_data = {
-        '年化報酬率': ([], '年化報酬率 (%)'),
+        '年化報酬率': ([], '3年年化報酬率 (%)'),
         '夏普比率': ([], '夏普比率'),
         '低波動': ([], '年化波動率 (%)'),
         '低回撤': ([], '最大回撤 (%)'),
@@ -1042,7 +1038,7 @@ def plot_radar_chart(df_results, etf_type_prefix=""):
     
     for _, row in df_results.iterrows():
         try:
-            metrics_data['年化報酬率'][0].append((float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A'))), row['名稱'].strip(), row['證券代碼'].strip()))
+            metrics_data['年化報酬率'][0].append((float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['夏普比率'][0].append((float(row['夏普比率']), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['低波動'][0].append((float(row['年化波動率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
             metrics_data['低回撤'][0].append((float(row['最大回撤 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
@@ -1491,8 +1487,8 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     
     # 決定績效列的名稱
     if annualize:
-        return_col = '年化報酬率 (%)'
-        return_label = '年化報酬率 (%)'
+        return_col = '3年年化報酬率 (%)'
+        return_label = '3年年化報酬率 (%)'
     else:
         return_col = '績效 (%)'
         return_label = '績效 (%)'
@@ -1514,7 +1510,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     axes = axes.flatten()
     
     # 決定要排序的列名
-    sort_col = '年化報酬率 (%)' if annualize else '績效 (%)'
+    sort_col = '3年年化報酬率 (%)' if annualize else '績效 (%)'
     
     # 排序ETF：按報酬率降序
     df_sorted = df_results.sort_values(sort_col, ascending=False)
@@ -1621,7 +1617,7 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
             ret_1y = float(ret_1y) if ret_1y != 'N/A' else None
             
             # 3 年報酬率（用年化報酬率欄位）
-            ret_3y = row.get('年化報酬率 (%)', 'N/A')
+            ret_3y = row.get('3年年化報酬率 (%)', 'N/A')
             ret_3y = float(ret_3y) if ret_3y != 'N/A' else None
             
             names.append(f"{ticker}\n{name}")
@@ -1651,7 +1647,7 @@ def plot_dual_column_performance(df_results, etf_type_prefix=""):
         
         # 設定標籤
         ax.set_xlabel('ETF', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_title('ETF 績效對比：1年 vs 3年年化報酬率\n（紅色虛線表示無 3 年數據，顯示全部 ETF）', 
                     fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
         ax.set_xticks(x)
@@ -1691,7 +1687,7 @@ def plot_performance_comparison(df_results, etf_type_prefix="", annualize=True):
     for _, row in df_results.iterrows():
         name = row['名稱'].strip()
         ticker = row['證券代碼'].strip()
-        ret = float(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')))
+        ret = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')))
         
         # 分類邏輯：美股 vs 台股
         # 美股相關 ETF：00646、00662、00757、00983A（ARK創新）、00988A（統一全球創新）、00989A（摩根美國科技）
@@ -1845,7 +1841,7 @@ def plot_performance_comparison(df_results, etf_type_prefix="", annualize=True):
                    fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         
         ax.set_title('台股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
-        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_xticks(x_pos)
         
         # 改進 X 軸標籤：顯示完整的 ETF 名稱 + 代碼，垂直排列
@@ -1943,7 +1939,7 @@ def plot_performance_comparison(df_results, etf_type_prefix="", annualize=True):
                    fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         
         ax.set_title('美股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
-        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_xticks(x_pos)
         
         # 改進 X 軸標籤：顯示完整的 ETF 名稱 + 代碼，垂直排列
@@ -2075,7 +2071,7 @@ if __name__ == '__main__':
         df_results = df_filtered
         
         # 按績效/年化報酬率排序
-        sort_column = '年化報酬率 (%)' if should_annualize else '績效 (%)'
+        sort_column = '3年年化報酬率 (%)' if should_annualize else '績效 (%)'
         if sort_column in df_results.columns:
             df_results = df_results.sort_values(sort_column, ascending=False)
         
@@ -2104,7 +2100,7 @@ if __name__ == '__main__':
             name = row['名稱'][:18] + '..' if len(row['名稱']) > 20 else row['名稱']
             period = format_value(row['資料期間 (年)'], 2)
             ret_1y = format_value(row.get('1年年化報酬率 (%)', 'N/A'), 2)
-            annual_return = format_value(row.get('年化報酬率 (%)', row.get('績效 (%)', 'N/A')), 2)
+            annual_return = format_value(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')), 2)
             sharpe = format_value(row['夏普比率'], 2)
             volatility = format_value(row['年化波動率 (%)'], 2)
             max_dd = format_value(row['最大回撤 (%)'], 2)
@@ -2156,7 +2152,7 @@ if __name__ == '__main__':
         print(f"  ⚠️  數據不足: {insufficient} 支")
         
         # 計算數值型欄位的平均值（使用正確的列名）
-        return_col = '年化報酬率 (%)' if should_annualize else '績效 (%)'
+        return_col = '3年年化報酬率 (%)' if should_annualize else '績效 (%)'
         numeric_returns = [x for x in df_results[return_col] if x != 'N/A']
         numeric_volatility = [x for x in df_results['年化波動率 (%)'] if x != 'N/A']
         
