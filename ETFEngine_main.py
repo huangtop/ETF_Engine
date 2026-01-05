@@ -14,13 +14,13 @@ import signal
 # 抑制警告
 warnings.filterwarnings('ignore')
 
-# 超時處理：10 分鐘
+# 超時處理：30 分鐘（足以下載和分析多個 ETF）
 def timeout_handler(signum, frame):
-    print("\n❌ 程式執行超時（10 分鐘），強制退出")
+    print("\n❌ 程式執行超時（30 分鐘），強制退出")
     sys.exit(1)
 
 signal.signal(signal.SIGALRM, timeout_handler)
-signal.alarm(600)  # 10 分鐘
+signal.alarm(1800)  # 30 分鐘
 
 # 設定環境變數，避免 tkinter 衝突
 os.environ['MPLBACKEND'] = 'Agg'
@@ -456,6 +456,10 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         clean_ticker = ticker.strip()
         print(f"  清理後的ticker: '{clean_ticker}'")
         
+        # 下載完整歷史資料（用於計算 1 年和 3 年報酬率）
+        df_full = download_price_data(clean_ticker, start_date='2015-01-01', end_date=end_date)
+        
+        # 下載統一期間資料（用於計算全期報酬和其他指標）
         df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date)
         
         if df.empty:
@@ -467,8 +471,46 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         if len(df) < 10:
             print(f"{clean_ticker} 有效資料太少")
             return None
+        
+        # 用完整歷史資料計算 1 年和 3 年報酬率
+        if not df_full.empty:
+            prices_full = df_full['Close']
+            if isinstance(prices_full, pd.DataFrame):
+                prices_full = prices_full.iloc[:, 0]
             
-        # 提取價格和收益率
+            # 1 年報酬率
+            if len(prices_full) >= 252:
+                period_1y_prices = prices_full.iloc[-252:]
+                start_1y = float(period_1y_prices.iloc[0])
+                end_1y = float(period_1y_prices.iloc[-1])
+                years_1y = len(period_1y_prices) / 252
+                ret_1y = (end_1y / start_1y) ** (1 / years_1y) - 1
+                days_1y = len(period_1y_prices)
+            else:
+                ret_1y = np.nan
+                days_1y = len(prices_full)
+            
+            # 3 年報酬率
+            if len(prices_full) >= 756:
+                period_3y_prices = prices_full.iloc[-756:]
+                start_3y = float(period_3y_prices.iloc[0])
+                end_3y = float(period_3y_prices.iloc[-1])
+                years_3y = len(period_3y_prices) / 252
+                ret_3y = (end_3y / start_3y) ** (1 / years_3y) - 1
+                days_3y = len(period_3y_prices)
+            else:
+                ret_3y = np.nan
+                days_3y = len(prices_full)
+            
+            if not (pd.isna(ret_1y) and pd.isna(ret_3y)):
+                ret_1y_pct = f"{ret_1y*100:.2f}%" if not pd.isna(ret_1y) else "N/A"
+                ret_3y_pct = f"{ret_3y*100:.2f}%" if not pd.isna(ret_3y) else "N/A"
+                print(f"  📊 完整歷史：{len(df_full)} 天 | 1年: {ret_1y_pct} | 3年: {ret_3y_pct}")
+        else:
+            ret_1y, ret_3y = np.nan, np.nan
+            print(f"  ⚠️  {clean_ticker} 無完整歷史資料")
+            
+        # 提取價格和收益率（統一期間）
         prices = df['Close']
         if isinstance(prices, pd.DataFrame):
             prices = prices.iloc[:, 0]
@@ -558,7 +600,8 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         return {
             '證券代碼': clean_ticker,
             '名稱': etf_name,
-            '數據天數': len(df),
+            '數據天數': len(df),  # 統一期間的資料天數
+            '完整歷史天數': len(df_full) if not df_full.empty else 0,  # 完整歷史資料天數
             '資料期間 (年)': round(data_years, 2),
             '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
             '年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 'N/A',  # 用3年數據作為主要報酬率
@@ -1554,6 +1597,86 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     plt.close()
 
 
+def plot_dual_column_performance(df_results, etf_type_prefix=""):
+    """繪製雙柱狀圖表：1年年化報酬率 vs 3年年化報酬率（業界標準）"""
+    plt = setup_matplotlib_backend()
+    setup_chinese_font()
+    
+    print("\n📊 繪製雙柱狀績效圖表（1年 vs 3年）...")
+    
+    try:
+        fig, ax = plt.subplots(figsize=(16, 9))
+        
+        # 準備數據
+        names = []
+        ret_1y_list = []
+        ret_3y_list = []
+        
+        for _, row in df_results.iterrows():
+            ticker = row['證券代碼'].strip()
+            name = row['名稱'].strip()
+            
+            # 1 年報酬率
+            ret_1y = row.get('1年年化報酬率 (%)', 'N/A')
+            ret_1y = float(ret_1y) if ret_1y != 'N/A' else None
+            
+            # 3 年報酬率（用年化報酬率欄位）
+            ret_3y = row.get('年化報酬率 (%)', 'N/A')
+            ret_3y = float(ret_3y) if ret_3y != 'N/A' else None
+            
+            names.append(f"{ticker}\n{name}")
+            ret_1y_list.append(ret_1y if ret_1y is not None else 0)
+            ret_3y_list.append(ret_3y if ret_3y is not None else 0)
+        
+        # 設定 X 軸位置
+        x = np.arange(len(names))
+        width = 0.35
+        
+        # 繪製雙柱
+        bars1 = ax.bar(x - width/2, ret_1y_list, width, label='1年年化報酬率', color='#3498db', alpha=0.8, edgecolor='black', linewidth=1)
+        bars2 = ax.bar(x + width/2, ret_3y_list, width, label='3年年化報酬率', color='#e74c3c', alpha=0.8, edgecolor='black', linewidth=1)
+        
+        # 添加數值標籤
+        for bar in bars1:
+            height = bar.get_height()
+            if height != 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        for bar in bars2:
+            height = bar.get_height()
+            if height != 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        
+        # 設定標籤
+        ax.set_xlabel('ETF', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_ylabel('年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_title('ETF 績效對比：1年 vs 3年年化報酬率\n（紅色虛線表示無 3 年數據，顯示全部 ETF）', 
+                    fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
+        ax.set_xticks(x)
+        ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
+        
+        # 添加基準線
+        ax.axhline(y=0, color='black', linestyle='-', linewidth=1.5, alpha=0.7)
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # 圖例
+        ax.legend(fontsize=FONT_SIZE_CONFIG['label_medium'], loc='upper right', frameon=True, fancybox=True, shadow=True)
+        
+        plt.tight_layout()
+        
+        # 保存
+        output_path = os.path.join(output_folder, f'{etf_type_prefix}etf_dual_column_performance.png')
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        print(f"  ✅ 雙柱狀圖表已儲存: {output_path}")
+        
+    except Exception as e:
+        print(f"  ❌ 雙柱狀圖表生成失敗: {e}")
+    
+    plt.close()
+
+
 def plot_performance_comparison(df_results, etf_type_prefix="", annualize=True):
     """繪製績效比較柱狀圖 - 自動根據 ETF 類型生成 _TW 或 _US 版本"""
     plt = setup_matplotlib_backend()
@@ -1938,10 +2061,10 @@ if __name__ == '__main__':
         # 過濾：只顯示滿 3 年以上的 ETF（符合業界標準）
         print(f"\n📊 過濾成立不到 3 年的 ETF...")
         min_days_3years = 756  # 3 年 = 756 個交易日
-        df_filtered = df_results[df_results['數據天數'] >= min_days_3years].copy()
+        df_filtered = df_results[df_results['完整歷史天數'] >= min_days_3years].copy()
         
         if len(df_filtered) == 0:
-            print(f"⚠️  沒有任何 ETF 的成立時間達到 3 年以上")
+            print(f"⚠️  沒有任何 ETF 的完整歷史達到 3 年以上")
             df_filtered = df_results  # 如果沒有 3 年+的 ETF，使用全部資料
             etf_filter_status = "（無 3 年+的 ETF，顯示全部）"
         else:
@@ -2083,7 +2206,14 @@ if __name__ == '__main__':
                 print(f"  ❌ 多指標比較圖失敗: {e}")
             
             try:
-                print("  📊 4. 繪製績效比較圖...")
+                print("  📊 4. 繪製雙柱狀績效圖表（1年 vs 3年）...")
+                plot_dual_column_performance(df_results, etf_type_prefix)
+                print("  ✅ 雙柱狀績效圖表完成")
+            except Exception as e:
+                print(f"  ❌ 雙柱狀績效圖表失敗: {e}")
+            
+            try:
+                print("  📊 5. 繪製績效比較圖...")
                 plot_performance_comparison(df_results, etf_type_prefix, annualize=should_annualize)
                 print("  ✅ 績效比較圖完成")
             except Exception as e:
