@@ -67,3 +67,9 @@ TEST_SUMMARY.sh
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Cache directories
+price_cache/
+
+# Output directories (generated charts and CSV files)
+Output_*/
