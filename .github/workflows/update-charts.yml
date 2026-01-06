@@ -29,7 +29,7 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Install Chrome and comprehensive Chinese fonts
+      - name: Install Chrome
         run: |
           sudo apt-get update
           sudo apt-get install -y wget gnupg
@@ -38,31 +38,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
 
-      - name: Install comprehensive Chinese fonts
+      - name: Install Chinese fonts
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            fonts-wqy-zenhei \
-            fonts-wqy-microhei \
-            fonts-noto-cjk \
-            fonts-noto-cjk-extra \
-            fonts-arphic-ukai \
-            fonts-arphic-uming \
-            fonts-ipafont-mincho \
-            fonts-ipafont-gothic \
-            fonts-unfonts-core \
-            fonts-droid-fallback \
-            fontconfig
-          
-          # 強制更新字體快取
+          sudo apt-get install -y fonts-wqy-zenhei fonts-wqy-microhei fonts-noto-cjk fonts-noto-cjk-extra fonts-arphic-ukai fonts-arphic-uming fonts-ipafont-mincho fonts-ipafont-gothic fonts-unfonts-core fontconfig
+          # 強制更新字體快取  
           sudo fc-cache -fv
-          
-          # 驗證中文字體安裝
-          echo "🔍 檢查可用中文字體："
-          fc-list :lang=zh | head -10 || echo "未找到中文字體"
-          
-          # 檢查 Noto CJK 字體
-          find /usr/share/fonts -name "*CJK*" -o -name "*noto*" | head -5
+          # 檢查中文字體
+          echo "🔍 可用中文字體："
+          fc-list :lang=zh | head -5 || echo "未找到中文字體"
 
       - name: Install dependencies
         run: |
@@ -72,12 +56,9 @@ jobs:
       - name: Generate Active ETF Charts
         env:
           MPLBACKEND: Agg
-          FONTCONFIG_PATH: /etc/fonts
           LANG: zh_TW.UTF-8
         run: |
           echo "🚀 生成主動式ETF圖表..."
-          echo "字體環境檢查："
-          fc-list :lang=zh | wc -l | xargs echo "中文字體數量："
           python ETFEngine_main.py active_etf
         continue-on-error: true
 
@@ -92,12 +73,9 @@ jobs:
       - name: Generate High Dividend ETF Charts
         env:
           MPLBACKEND: Agg
-          FONTCONFIG_PATH: /etc/fonts
           LANG: zh_TW.UTF-8
         run: |
           echo "💰 生成高股息ETF圖表..."
-          echo "字體環境檢查："
-          fc-list :lang=zh | wc -l | xargs echo "中文字體數量："
           python ETFEngine_main.py high_dividend_etf
         continue-on-error: true
 
@@ -112,12 +90,9 @@ jobs:
       - name: Generate Industry ETF Charts
         env:
           MPLBACKEND: Agg
-          FONTCONFIG_PATH: /etc/fonts
           LANG: zh_TW.UTF-8
         run: |
           echo "🏭 生成產業型ETF圖表..."
-          echo "字體環境檢查："
-          fc-list :lang=zh | wc -l | xargs echo "中文字體數量："
           python ETFEngine_main.py industry_etf
         continue-on-error: true
 
@@ -134,7 +109,7 @@ jobs:
           # 創建統一輸出目錄
           mkdir -p website_output
           
-          # 複製所有生成的圖表和數據
+          # 複製所有生成的圖表
           if [ -d "Output_Active_ETF" ]; then
             cp -r Output_Active_ETF website_output/
           fi
@@ -147,104 +122,8 @@ jobs:
             cp -r Output_Industry_ETF website_output/
           fi
           
-          # 生成索引頁面
-          cat > website_output/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="zh-TW">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>ETF 分析圖表</title>
-              <style>
-                  body { font-family: Arial, sans-serif; margin: 40px; }
-                  h1 { color: #2c3e50; }
-                  .section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
-                  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-                  .chart-item { text-align: center; }
-                  img { max-width: 100%; height: auto; border: 1px solid #ccc; border-radius: 4px; }
-                  .timestamp { color: #7f8c8d; font-size: 0.9em; }
-              </style>
-          </head>
-          <body>
-              <h1>🔄 ETF 自動分析系統</h1>
-              <p class="timestamp">最後更新: $(date '+%Y-%m-%d %H:%M:%S UTC')</p>
-              
-              <div class="section">
-                  <h2>🚀 主動式 ETF 分析</h2>
-                  <div class="chart-grid">
-          EOF
-          
-          # 添加主動式 ETF 圖表
-          if [ -d "website_output/Output_Active_ETF" ]; then
-              for img in website_output/Output_Active_ETF/*.png; do
-                  if [ -f "$img" ]; then
-                      filename=$(basename "$img")
-                      echo "            <div class=\"chart-item\">" >> website_output/index.html
-                      echo "                <h3>$filename</h3>" >> website_output/index.html
-                      echo "                <img src=\"Output_Active_ETF/$filename\" alt=\"$filename\">" >> website_output/index.html
-                      echo "            </div>" >> website_output/index.html
-                  fi
-              done
-          fi
-          
-          cat >> website_output/index.html << 'EOF'
-                  </div>
-              </div>
-              
-              <div class="section">
-                  <h2>💰 高股息 ETF 分析</h2>
-                  <div class="chart-grid">
-          EOF
-          
-          # 添加高股息 ETF 圖表  
-          if [ -d "website_output/Output_HighDividend_ETF" ]; then
-              for img in website_output/Output_HighDividend_ETF/*.png; do
-                  if [ -f "$img" ]; then
-                      filename=$(basename "$img")
-                      echo "            <div class=\"chart-item\">" >> website_output/index.html
-                      echo "                <h3>$filename</h3>" >> website_output/index.html
-                      echo "                <img src=\"Output_HighDividend_ETF/$filename\" alt=\"$filename\">" >> website_output/index.html
-                      echo "            </div>" >> website_output/index.html
-                  fi
-              done
-          fi
-          
-          cat >> website_output/index.html << 'EOF'
-                  </div>
-              </div>
-              
-              <div class="section">
-                  <h2>🏭 產業型 ETF 分析</h2>
-                  <div class="chart-grid">
-          EOF
-          
-          # 添加產業型 ETF 圖表
-          if [ -d "website_output/Output_Industry_ETF" ]; then
-              for img in website_output/Output_Industry_ETF/*.png; do
-                  if [ -f "$img" ]; then
-                      filename=$(basename "$img")
-                      echo "            <div class=\"chart-item\">" >> website_output/index.html
-                      echo "                <h3>$filename</h3>" >> website_output/index.html
-                      echo "                <img src=\"Output_Industry_ETF/$filename\" alt=\"$filename\">" >> website_output/index.html
-                      echo "            </div>" >> website_output/index.html
-                  fi
-              done
-          fi
-          
-          cat >> website_output/index.html << 'EOF'
-                  </div>
-              </div>
-              
-              <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #7f8c8d;">
-                  <p>🤖 自動生成 | 📊 資料來源: TWSE, Alpha Vantage | ⏰ 每週更新</p>
-              </footer>
-          </body>
-          </html>
-          EOF
-          
-          echo "📊 生成結果統計："
-          find website_output -name "*.png" | wc -l | xargs echo "總圖表數："
-          find website_output -name "*.csv" | wc -l | xargs echo "總CSV數："
+          echo "📊 Generated charts:"
+          find website_output -name "*.png" | wc -l | xargs echo "Total PNG files:"
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -266,14 +145,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "feat: weekly automated ETF charts update
-
-🤖 Automated generation results:
-- Active ETF: $(find Output_Active_ETF -name '*.png' 2>/dev/null | wc -l) charts
-- High Dividend ETF: $(find Output_HighDividend_ETF -name '*.png' 2>/dev/null | wc -l) charts  
-- Industry ETF: $(find Output_Industry_ETF -name '*.png' 2>/dev/null | wc -l) charts
-
-Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
-Environment: GitHub Actions Ubuntu with Chinese font support"
+            git commit -m "feat: weekly automated ETF charts update - $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
             git push
           fi
