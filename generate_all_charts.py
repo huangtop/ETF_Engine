@@ -107,8 +107,8 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
     plt = setup_matplotlib_backend()
     setup_chinese_font()
     
-    categories = ['年化報酬率', '夏普比率', '波動率(反)', '最大回撤(反)', '追蹤誤差(反)']
-    categories_en = ['Return', 'Sharpe', 'Low Volatility', 'Low Max DD', 'Low Tracking Error']
+    categories = ['1年年化報酬率', '夏普比率', '波動率(反)', '最大回撤(反)', '追蹤誤差(反)']
+    categories_en = ['1Y Return', 'Sharpe', 'Low Volatility', 'Low Max DD', 'Low Tracking Error']
     
     N = len(categories)
     angles = [n / float(N) * 2 * pi for n in range(N)]
@@ -132,21 +132,24 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
             # 預設為 taiwan_stock
             tw_stock_etfs.append(row)
     
-    # 收集數據範圍（基於全部資料）
+    # 收集數據範圍（雷達圖強制使用1年數據）
     all_returns, all_sharpe, all_vol, all_dd, all_te = [], [], [], [], []
     
     for _, row in df_results.iterrows():
-        if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A':
-            all_returns.append(float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))))
-        if row['夏普比率'] != 'N/A':
-            all_sharpe.append(float(row['夏普比率']))
-        if row['年化波動率 (%)'] != 'N/A':
-            all_vol.append(float(row['年化波動率 (%)']))
-        if row['最大回撤 (%)'] != 'N/A':
+        # 使用1年年化報酬率
+        if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A':
+            all_returns.append(float(row.get('1年年化報酬率 (%)', 'N/A')))
+            
+        # 其他指標：使用1年版本
+        if row['1年夏普比率'] != 'N/A':
+            all_sharpe.append(float(row['1年夏普比率']))
+        if row['1年年化波動率 (%)'] != 'N/A':
+            all_vol.append(float(row['1年年化波動率 (%)']))
+        if row['1年最大回撤 (%)'] != 'N/A':
             # 最大回撤取絕對值後再加入範圍計算
-            all_dd.append(abs(float(row['最大回撤 (%)'])))
-        if row['追蹤誤差 (%)'] != 'N/A':
-            all_te.append(float(row['追蹤誤差 (%)']))
+            all_dd.append(abs(float(row['1年最大回撤 (%)'])))
+        if row['1年追蹤誤差 (%)'] != 'N/A':
+            all_te.append(float(row['1年追蹤誤差 (%)']))
     
     # 計算範圍
     return_min, return_max = (min(all_returns), max(all_returns)) if all_returns else (0, 1)
@@ -175,24 +178,24 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
             # 使用短名稱
             display_name = f"{ticker.replace('.TW', '')}\n{short_name}".replace('\n', ' ')
             
-            # 計算標準化數值
+            # 計算標準化數值（使用1年年化報酬率）
             values = []
-            ret_val = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
+            ret_val = float(row.get('1年年化報酬率 (%)', 'N/A')) if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A' else return_min
             values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
             
-            sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
+            sharpe_val = float(row['1年夏普比率']) if row['1年夏普比率'] != 'N/A' else sharpe_min
             values.append(normalize_value(sharpe_val, sharpe_min, sharpe_max, reverse=False))
             
-            vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
+            vol_val = float(row['1年年化波動率 (%)']) if row['1年年化波動率 (%)'] != 'N/A' else vol_max
             values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
             
-            # 最大回撤取絕對值（在all_dd收集時已轉為正數，這裡直接使用）
-            dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+            # 最大回撤取絕對值
+            dd_val = float(row['1年最大回撤 (%)']) if row['1年最大回撤 (%)'] != 'N/A' else dd_min
             if dd_val < 0:
                 dd_val = abs(dd_val)
             values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
             
-            te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
+            te_val = float(row['1年追蹤誤差 (%)']) if row['1年追蹤誤差 (%)'] != 'N/A' else te_max
             values.append(normalize_value(te_val, te_min, te_max, reverse=True))
             
             values += values[:1]  # 閉合圖形
@@ -218,7 +221,7 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
         except:
             ax.set_xticklabels(categories_en, fontsize=14, fontweight='bold')
         
-        ax.set_title(title + " (2026-01-06 17:15生成)", fontsize=18, pad=40, fontweight='bold')
+        ax.set_title(generate_chart_title_with_timestamp(title), fontsize=18, pad=40, fontweight='bold')
         ax.set_ylim(0, 100)
         ax.set_yticks([20, 40, 60, 80, 100])
         ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=12)
@@ -359,24 +362,24 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
         # 使用短名稱（總覽圖用更簡潔版本）
         display_name = f"{ticker.replace('.TW', '')} {short_name}"
         
-        # 計算標準化數值
+        # 計算標準化數值（使用1年年化報酬率）
         values = []
-        ret_val = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))) if row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')) != 'N/A' else return_min
+        ret_val = float(row.get('1年年化報酬率 (%)', 'N/A')) if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A' else return_min
         values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
         
-        sharpe_val = float(row['夏普比率']) if row['夏普比率'] != 'N/A' else sharpe_min
+        sharpe_val = float(row['1年夏普比率']) if row['1年夏普比率'] != 'N/A' else sharpe_min
         values.append(normalize_value(sharpe_val, sharpe_min, sharpe_max, reverse=False))
         
-        vol_val = float(row['年化波動率 (%)']) if row['年化波動率 (%)'] != 'N/A' else vol_max
+        vol_val = float(row['1年年化波動率 (%)']) if row['1年年化波動率 (%)'] != 'N/A' else vol_max
         values.append(normalize_value(vol_val, vol_min, vol_max, reverse=True))
         
-        # 最大回撤取絕對值（在all_dd收集時已轉為正數，這裡直接使用）
-        dd_val = float(row['最大回撤 (%)']) if row['最大回撤 (%)'] != 'N/A' else dd_min
+        # 最大回撤取絕對值
+        dd_val = float(row['1年最大回撤 (%)']) if row['1年最大回撤 (%)'] != 'N/A' else dd_min
         if dd_val < 0:
             dd_val = abs(dd_val)
         values.append(normalize_value(dd_val, dd_min, dd_max, reverse=True))
         
-        te_val = float(row['追蹤誤差 (%)']) if row['追蹤誤差 (%)'] != 'N/A' else te_max
+        te_val = float(row['1年追蹤誤差 (%)']) if row['1年追蹤誤差 (%)'] != 'N/A' else te_max
         values.append(normalize_value(te_val, te_min, te_max, reverse=True))
         
         values += values[:1]  # 閉合圖形
@@ -404,7 +407,7 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
         ax.set_xticklabels(categories_en, fontsize=13, fontweight='bold')
         title = 'ETF Overview Radar Chart\n△US-Related ●TW-Stock ■TW-Dividend'
     
-    ax.set_title(title + " (2026-01-06 17:15生成)", fontsize=18, pad=40, fontweight='bold')
+    ax.set_title(generate_chart_title_with_timestamp(title), fontsize=18, pad=40, fontweight='bold')
     ax.set_ylim(0, 100)
     ax.set_yticks([20, 40, 60, 80, 100])
     ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10)
@@ -437,22 +440,30 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
     print(f"\n🏆 各指標冠軍:")
     champion_info = []
     
-    # 計算冠軍
+    # 計算冠軍（雷達圖使用1年指標，所以冠軍也用1年）
     metrics_data = {
-        '年化報酬率': ([], '3年年化報酬率 (%)'),
-        '夏普比率': ([], '夏普比率'),
-        '低波動': ([], '年化波動率 (%)'),
-        '低回撤': ([], '最大回撤 (%)'),
-        '低追蹤誤差': ([], '追蹤誤差 (%)'),
+        '年化報酬率': ([], '1年年化報酬率 (%)'),
+        '夏普比率': ([], '1年夏普比率'),
+        '低波動': ([], '1年年化波動率 (%)'),
+        '低回撤': ([], '1年最大回撤 (%)'),
+        '低追蹤誤差': ([], '1年追蹤誤差 (%)'),
     }
     
     for _, row in df_results.iterrows():
         try:
-            metrics_data['年化報酬率'][0].append((float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A'))), row['名稱'].strip(), row['證券代碼'].strip()))
-            metrics_data['夏普比率'][0].append((float(row['夏普比率']), row['名稱'].strip(), row['證券代碼'].strip()))
-            metrics_data['低波動'][0].append((float(row['年化波動率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
-            metrics_data['低回撤'][0].append((float(row['最大回撤 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
-            metrics_data['低追蹤誤差'][0].append((float(row['追蹤誤差 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            # 使用1年版本的指標計算冠軍
+            ret_1y = row.get('1年年化報酬率 (%)', 'N/A')
+            if ret_1y != 'N/A' and ret_1y != 9999:
+                metrics_data['年化報酬率'][0].append((float(ret_1y), row['名稱'].strip(), row['證券代碼'].strip()))
+            
+            if row['1年夏普比率'] != 'N/A':
+                metrics_data['夏普比率'][0].append((float(row['1年夏普比率']), row['名稱'].strip(), row['證券代碼'].strip()))
+            if row['1年年化波動率 (%)'] != 'N/A':
+                metrics_data['低波動'][0].append((float(row['1年年化波動率 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            if row['1年最大回撤 (%)'] != 'N/A':
+                metrics_data['低回撤'][0].append((float(row['1年最大回撤 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
+            if row['1年追蹤誤差 (%)'] != 'N/A':
+                metrics_data['低追蹤誤差'][0].append((float(row['1年追蹤誤差 (%)']), row['名稱'].strip(), row['證券代碼'].strip()))
         except (ValueError, KeyError):
             pass
     
@@ -806,18 +817,21 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                   '#FF9F40', '#C9CBCF', '#7BC225', '#FF5733', '#C70039', '#8B4513']
         
         # 先繪製基準指數（較粗的線條）
+        # 下載0050作為基準，並保存數據用於相對計算
+        benchmark_0050_data = None
         try:
-            # 台股基準 - 改用台灣50(0050)以保持與trend_tw_stock.png一致
+            # 台股基準 - 0050固定在Y=100作為基準線
             print("正在下載台灣50基準指數...")
             tw_index = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date)
             if not tw_index.empty:
                 tw_prices = tw_index['Close']
                 if isinstance(tw_prices, pd.DataFrame):
                     tw_prices = tw_prices.iloc[:, 0]
-                tw_normalized = (tw_prices / tw_prices.iloc[0]) * 100
-                plt.plot(tw_normalized.index, tw_normalized, 
-                        label='台灣50 (0050)', linewidth=3, color='#FF0000', 
-                        linestyle='--', alpha=0.8)
+                
+                # 0050 固定在基準線 Y=100（水平線）
+                plt.axhline(y=100, label='台灣50 (0050) 基準線', linewidth=4, color='#FF0000', 
+                           linestyle='-', alpha=0.9, zorder=10)
+                benchmark_0050_data = tw_prices  # 保存用於相對計算
         except Exception as e:
             print(f"台灣50下載失敗: {e}")
         
@@ -836,7 +850,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         except Exception as e:
             print(f"S&P 500指數下載失敗: {e}")
         
-        # 繪製各ETF（較細的線條）
+        # 繪製各ETF（相對於0050的表現）
         for i, (ticker, name) in enumerate(etf_list.items()):
             try:
                 df = download_price_data(ticker.strip(), start_date=common_start_date, end_date=latest_date)
@@ -845,32 +859,57 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     if isinstance(prices, pd.DataFrame):
                         prices = prices.iloc[:, 0]
                     
-                    # 正規化為起始點100
-                    normalized_prices = (prices / prices.iloc[0]) * 100
-                    
-                    color = colors[i % len(colors)]
-                    line_style = '-'
-                    alpha = 0.7
-                    
-                    # 使用簡化名稱
-                    short_name = name.strip()
-                    display_name = f"{ticker.replace('.TW', '')} {short_name}"
-                    
-                    plt.plot(normalized_prices.index, normalized_prices, 
-                            label=display_name, linewidth=2, color=color, 
-                            linestyle=line_style, alpha=alpha)
+                    # 計算相對於0050的表現
+                    if benchmark_0050_data is not None:
+                        # 對齊日期
+                        common_dates = prices.index.intersection(benchmark_0050_data.index)
+                        if len(common_dates) > 0:
+                            etf_aligned = prices.loc[common_dates]
+                            benchmark_aligned = benchmark_0050_data.loc[common_dates]
+                            
+                            # 相對表現 = (ETF漲幅 / 0050漲幅) × 100
+                            etf_return = etf_aligned / etf_aligned.iloc[0]
+                            benchmark_return = benchmark_aligned / benchmark_aligned.iloc[0]
+                            relative_performance = (etf_return / benchmark_return) * 100
+                            
+                            color = colors[i % len(colors)]
+                            line_style = '-'
+                            alpha = 0.7
+                            
+                            # 使用簡化名稱
+                            short_name = name.strip()
+                            display_name = f"{ticker.replace('.TW', '')} {short_name}"
+                            
+                            plt.plot(relative_performance.index, relative_performance, 
+                                    label=display_name, linewidth=2, color=color, 
+                                    linestyle=line_style, alpha=alpha)
+                        else:
+                            print(f"{ticker} 與0050無共同日期")
+                    else:
+                        # 如果沒有0050基準，使用自己的起始點100
+                        normalized_prices = (prices / prices.iloc[0]) * 100
+                        
+                        color = colors[i % len(colors)]
+                        line_style = '-'
+                        alpha = 0.7
+                        
+                        short_name = name.strip()
+                        display_name = f"{ticker.replace('.TW', '')} {short_name}"
+                        
+                        plt.plot(normalized_prices.index, normalized_prices, 
+                                label=display_name, linewidth=2, color=color, 
+                                linestyle=line_style, alpha=alpha)
             except Exception as e:
                 print(f"{ticker} 折線圖繪製失敗: {e}")
         
         # 設定標題和標籤
         try:
-            title = generate_chart_title_with_timestamp('ETF vs 基準指數總覽 (基準點=100)\n紅線：台股加權 | 藍線：S&P500')
-            plt.title(title + " (2026-01-06 17:15生成)", fontsize=16, fontweight='bold')
+            title = generate_chart_title_with_timestamp('ETF 相對台灣50(0050)表現總覽\n基準線：0050固定在100 | >100:跑贏 | <100:跑輸')
+            plt.title(title + " (2026-01-07 02:05生成)", fontsize=16, fontweight='bold')
             plt.xlabel('日期', fontsize=12)
-            plt.ylabel('相對淨值 (起始=100)', fontsize=12)
+            plt.ylabel('相對表現 (0050=100)', fontsize=12)
         except:
-            title = generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500')
-            plt.title(title + " (2026-01-06 17:15生成)", fontsize=16, fontweight='bold')
+            plt.title(generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500'), fontsize=16, fontweight='bold')
             plt.xlabel('Date', fontsize=12)
             plt.ylabel('Relative NAV (Start=100)', fontsize=12)
             
@@ -1038,7 +1077,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                 title = f'{category_name} 表現比較\n(各自起始點=100)'
                 ylabel = '相對淨值 (起始=100)'
             
-            plt.title(title + " (2026-01-06 17:15生成)", fontsize=14, fontweight='bold')
+            plt.title(generate_chart_title_with_timestamp(title), fontsize=14, fontweight='bold')
             plt.xlabel('日期', fontsize=12)
             plt.ylabel(ylabel, fontsize=12)
         except:
@@ -1387,7 +1426,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
     for _, row in df_results.iterrows():
         name = row['名稱'].strip()
         ticker = row['證券代碼'].strip()
-        ret = float(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')))
+        ret = float(row.get('1年年化報酬率 (%)', 'N/A')) if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A' else 0
         
         # 分類邏輯：美股 vs 台股
         # 美股相關 ETF：00646、00662、00757、00983A（ARK創新）、00988A（統一全球創新）、00989A（摩根美國科技）
@@ -1637,7 +1676,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
                    f'{ret:.1f}%', ha='center', va='bottom',
                    fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         
-        ax.set_title('美股 ETF 年化報酬率比較 (含基準) (2026-01-06 17:15生成)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        ax.set_title(generate_chart_title_with_timestamp('美股 ETF 年化報酬率比較 (含基準)'), fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_xticks(x_pos)
         

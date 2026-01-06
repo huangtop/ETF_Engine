@@ -369,22 +369,57 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
                 print(f"  ⚠️  {clean_ticker} 可能存在股票分割或復權問題（年化: {cagr*100:.2f}%, 實績: {total_return*100:.2f}%）")
                 print(f"      建議檢查：{start_price:.2f} → {end_price:.2f}")
         
+        # 計算指標（分兩個版本：完整期間 vs 1年期間）
         vol = calculate_volatility(returns)
         sharpe = calculate_sharpe(cagr, vol, rf=risk_free_rate)
         mdd = calculate_max_drawdown(prices)
         
-        # 計算追蹤誤差
+        # 🎯 為雷達圖計算1年版本的指標
+        from datetime import datetime, timedelta
+        latest_date_dt = datetime.strptime(latest_date, '%Y-%m-%d')
+        one_year_ago = latest_date_dt - timedelta(days=365)
+        one_year_start = one_year_ago.strftime('%Y-%m-%d')
+        
+        # 獲取1年期間的數據
+        if one_year_start in prices.index:
+            prices_1y = prices.loc[one_year_start:]
+            returns_1y = prices_1y.pct_change().dropna()
+            
+            # 計算1年指標  
+            vol_1y = calculate_volatility(returns_1y)
+            cagr_1y, _ = calculate_returns(prices_1y, annualize=True)  # 只取報酬率，忽略年數
+            sharpe_1y = calculate_sharpe(cagr_1y, vol_1y, rf=risk_free_rate)
+            mdd_1y = calculate_max_drawdown(prices_1y)
+        else:
+            # 如果沒有1年數據，使用完整期間數據
+            vol_1y, sharpe_1y, mdd_1y = vol, sharpe, mdd
+        
+        # 計算追蹤誤差（完整期間和1年期間）
+        te = np.nan
+        te_1y = np.nan
         try:
             if benchmark_returns is not None and len(benchmark_returns) > 0:
                 common_idx = returns.index.intersection(benchmark_returns.index)
                 if len(common_idx) > 10:
                     te = tracking_error(returns.loc[common_idx], benchmark_returns.loc[common_idx])
+                
+                # 計算1年追蹤誤差
+                if one_year_start in prices.index and one_year_start in benchmark_returns.index:
+                    returns_1y_te = prices.loc[one_year_start:].pct_change().dropna()
+                    benchmark_1y_te = benchmark_returns.loc[one_year_start:]
+                    common_1y_idx = returns_1y_te.index.intersection(benchmark_1y_te.index)
+                    if len(common_1y_idx) > 10:
+                        te_1y = tracking_error(returns_1y_te.loc[common_1y_idx], benchmark_1y_te.loc[common_1y_idx])
+                    else:
+                        te_1y = te
                 else:
-                    te = np.nan
+                    te_1y = te
             else:
                 te = np.nan
+                te_1y = np.nan
         except:
             te = np.nan
+            te_1y = te
         
         # 從配置獲取字典數據
         dividend_yield_dict = config.get('devidend', config.get('dividend', {}))
@@ -441,6 +476,11 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '年化波動率 (%)': round(vol*100, 2) if not pd.isna(vol) else 'N/A',
             '最大回撤 (%)': round(mdd*100, 2) if not pd.isna(mdd) else 'N/A',
             '追蹤誤差 (%)': round(te*100, 2) if not pd.isna(te) else 'N/A',
+            # 🎯 新增：雷達圖專用的1年指標
+            '1年夏普比率': round(sharpe_1y, 2) if not pd.isna(sharpe_1y) else 'N/A',
+            '1年年化波動率 (%)': round(vol_1y*100, 2) if not pd.isna(vol_1y) else 'N/A',
+            '1年最大回撤 (%)': round(mdd_1y*100, 2) if not pd.isna(mdd_1y) else 'N/A',
+            '1年追蹤誤差 (%)': round(te_1y*100, 2) if not pd.isna(te_1y) else 'N/A',
             '換手率 (%)': turnover,
             '管理費 (%)': expense,
             '股息殖利率 (%)': dividend_yield
