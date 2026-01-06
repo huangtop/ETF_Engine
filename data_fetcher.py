@@ -144,6 +144,9 @@ def fetch_twse_price(ticker, start_date, end_date):
             df.set_index('Date', inplace=True)
             df = df.sort_index()
             
+            # 檢測並調整股票分割
+            df = adjust_for_stock_splits(df)
+            
             print(f"  ✅ 獲取 {ticker} {len(df)} 天資料（TWSE 官方 API）")
             return df
         else:
@@ -281,6 +284,86 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
     except Exception as e:
         print(f"  ❌ {symbol} 下載失敗: {e}")
         return pd.DataFrame()
+
+
+def detect_stock_splits(df, split_threshold=-0.3):
+    """
+    檢測股票分割事件
+    
+    Args:
+        df: 價格數據 DataFrame
+        split_threshold: 分割檢測閾值（預設 -30%）
+        
+    Returns:
+        list: 分割事件日期列表
+    """
+    if len(df) < 2:
+        return []
+    
+    # 計算日報酬率
+    daily_returns = df['Close'].pct_change()
+    
+    # 檢測異常跌幅（可能的分割事件）
+    split_events = []
+    for date, return_rate in daily_returns.items():
+        if return_rate < split_threshold and not pd.isna(return_rate):
+            split_events.append(date)
+            print(f"  🔍 檢測到可能的分割事件: {date.strftime('%Y-%m-%d')} (跌幅: {return_rate:.1%})")
+    
+    return split_events
+
+
+def adjust_for_stock_splits(df):
+    """
+    調整股票分割造成的價格失真
+    
+    Args:
+        df: 原始價格數據
+        
+    Returns:
+        pd.DataFrame: 調整後的價格數據
+    """
+    if df.empty:
+        return df
+    
+    # 檢測分割事件
+    split_events = detect_stock_splits(df)
+    
+    if not split_events:
+        return df
+    
+    print(f"  🔧 調整 {len(split_events)} 個分割事件...")
+    
+    adjusted_df = df.copy()
+    
+    for split_date in split_events:
+        try:
+            # 獲取分割前後的價格
+            split_idx = adjusted_df.index.get_loc(split_date)
+            
+            if split_idx > 0:
+                before_price = adjusted_df['Close'].iloc[split_idx - 1]
+                after_price = adjusted_df['Close'].iloc[split_idx]
+                
+                # 計算分割比例
+                split_ratio = before_price / after_price
+                
+                # 只有當比例在合理範圍內才調整（避免誤判）
+                if 1.5 <= split_ratio <= 10:
+                    print(f"    📊 {split_date.strftime('%Y-%m-%d')}: 調整比例 {split_ratio:.2f}:1")
+                    
+                    # 調整分割前的所有價格
+                    mask = adjusted_df.index < split_date
+                    adjusted_df.loc[mask, ['Open', 'High', 'Low', 'Close']] /= split_ratio
+                    
+                    # 調整成交量（乘以分割比例）
+                    adjusted_df.loc[mask, 'Volume'] *= split_ratio
+        
+        except Exception as e:
+            print(f"    ⚠️  調整 {split_date} 失敗: {e}")
+            continue
+    
+    return adjusted_df
 
 
 def is_us_stock(ticker):
