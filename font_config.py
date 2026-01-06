@@ -12,14 +12,25 @@ def setup_chinese_font_enhanced():
     支持macOS、Windows、Linux系统
     优先使用绝对路径指定字体，确保CI环境有效
     """
-    # 首先尝试使用系统中文字体（绝对路径优先，确保CI有效）
+    # 首先尝试使用系统中文字体（GitHub Actions 優化版）
     font_candidates = [
-        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.otf',  # Linux (CI环境)
-        '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',            # Linux (WenQuanYi备选)
-        '/Library/Fonts/STHeiti Medium.ttc',  # macOS - STHeiti
-        '/Library/Fonts/SimHei.ttf',      # macOS - Microsoft SimHei
-        '/System/Library/Fonts/STHeiti.ttc',  # macOS - STHeiti
-        'C:\\Windows\\Fonts\\SimHei.ttf', # Windows
+        # GitHub Actions Ubuntu 環境路徑
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc', 
+        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc',
+        '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+        '/usr/share/fonts/truetype/arphic/ukai.ttc',
+        '/usr/share/fonts/truetype/arphic/uming.ttc',
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        
+        # macOS 路徑
+        '/Library/Fonts/STHeiti Medium.ttc',
+        '/Library/Fonts/SimHei.ttf',
+        '/System/Library/Fonts/STHeiti.ttc',
+        
+        # Windows 路徑
+        'C:\\Windows\\Fonts\\SimHei.ttf',
     ]
     
     # 尝试查找可用字体
@@ -41,6 +52,10 @@ def setup_chinese_font_enhanced():
             'Noto Sans CJK SC', 
             'Noto Sans CJK JP',
             'WenQuanYi Zen Hei',
+            'WenQuanYi Micro Hei',
+            'AR PL UKai TW',
+            'AR PL UMing TW', 
+            'Droid Sans Fallback',
             'STHeiti',           # macOS
             'SimHei',            # Windows/Linux
             'DejaVu Sans',       # 备选
@@ -48,6 +63,18 @@ def setup_chinese_font_enhanced():
         ]
         matplotlib.rcParams['font.sans-serif'] = font_list
         print(f"⚠️  未找到字体文件，使用系统字体: {font_list}")
+        
+        # GitHub Actions 調試：列出系統可用字體
+        try:
+            import subprocess
+            result = subprocess.run(['fc-list', ':lang=zh'], capture_output=True, text=True, timeout=10)
+            if result.stdout:
+                print("🔍 系統中文字體列表:")
+                for line in result.stdout.split('\n')[:5]:  # 只顯示前5個
+                    if line.strip():
+                        print(f"  - {line.strip()}")
+        except:
+            print("⚠️  無法檢查系統字體列表")
     
     # 其他配置
     matplotlib.rcParams['axes.unicode_minus'] = False

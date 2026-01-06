@@ -289,8 +289,14 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         # 清理ticker格式
         clean_ticker = ticker.strip()
         
-        # 下載完整歷史資料（用於計算 1 年和 3 年報酬率）
-        df_full = download_price_data(clean_ticker, start_date='2015-01-01', end_date=end_date, config_type=config_type)
+        # 智能下載範圍：只下載必要的4年歷史資料（vs 原本11年）
+        # 計算起始日期：4年 = 1200天，足夠計算3年年化報酬率
+        from datetime import timedelta
+        end_dt = pd.to_datetime(end_date)
+        smart_start_date = (end_dt - timedelta(days=1200)).strftime('%Y-%m-%d')
+        
+        # 下載優化範圍的歷史資料
+        df_full = download_price_data(clean_ticker, start_date=smart_start_date, end_date=end_date, config_type=config_type)
         
         # 下載統一期間資料（用於計算全期報酬和其他指標）
         df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date, config_type=config_type)

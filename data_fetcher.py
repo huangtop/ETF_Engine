@@ -105,7 +105,7 @@ def fetch_twse_price(ticker, start_date, end_date):
             }
             
             try:
-                response = requests.get(url, params=params, timeout=2, verify=False)  # 進一步優化到 2 秒
+                response = requests.get(url, params=params, timeout=0.5, verify=False)  # GitHub Actions 專用：超級快速失敗
                 data = response.json()
                 
                 if data.get('data'):
@@ -219,7 +219,7 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
             'apikey': api_key
         }
         
-        response = requests.get(url, params=params, timeout=3)  # 從 10 秒改為 3 秒
+        response = requests.get(url, params=params, timeout=0.5)  # GitHub Actions 專用：1秒超時
         data = response.json()
         
         # 檢查 API 錯誤
