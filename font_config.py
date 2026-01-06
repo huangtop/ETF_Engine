@@ -1,8 +1,8 @@
 # 字体配置模块
 # 解决中文显示和字体大小问题
 
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
 import os
 

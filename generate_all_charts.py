@@ -16,21 +16,43 @@ import pandas as pd
 from math import pi
 from config_loader import load_etf_config
 from data_fetcher import download_price_data
+from add_timestamp_to_titles import add_timestamps_to_all_charts
 
 # Font size config
 FONT_SIZE_CONFIG = {
-    'title_large': 16,
-    'label_large': 12,
-    'label_medium': 10,
-    'tick_small': 9,
+    'title_large': 27,        # 大标题: 18 * 1.5
+    'title_medium': 21,       # 中标题: 14 * 1.5
+    'title_small': 18,        # 小标题: 12 * 1.5
+    
+    'label_large': 18,        # 大标签: 12 * 1.5
+    'label_medium': 15,       # 中标签: 10 * 1.5
+    'label_small': 13,        # 小标签: 8.5 * 1.5
+    
+    'tick_large': 16,         # 大刻度: ~10.5 * 1.5
+    'tick_medium': 13,        # 中刻度: ~8.5 * 1.5
+    'tick_small': 11,         # 小刻度: 7.5 * 1.5
+    
+    'legend': 26,             # 图例: 13 * 2（加大一倍）
+    'figure_text': 12,        # 图表说明文字
 }
 
+def generate_chart_title_with_timestamp(base_title):
+    """生成帶有時間戳的圖表標題"""
+    from datetime import datetime
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+    return f"{base_title} ({current_time} 生成)"
+
 def setup_matplotlib_backend():
-    """設定 matplotlib 後端並返回 pyplot"""
+    """設定 matplotlib 後端並返回 pyplot（優化版本）"""
     import matplotlib
     matplotlib.use('Agg', force=True)
     import matplotlib.pyplot as plt
     plt.ioff()
+    
+    # 優化渲染設置
+    plt.rcParams['figure.max_open_warning'] = 0  # 關閉過多圖表警告
+    plt.rcParams['agg.path.chunksize'] = 10000   # 優化路徑渲染
+    
     return plt
 
 def setup_chinese_font():
@@ -196,7 +218,7 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
         except:
             ax.set_xticklabels(categories_en, fontsize=14, fontweight='bold')
         
-        ax.set_title(title, fontsize=18, pad=40, fontweight='bold')
+        ax.set_title(title + " (2026-01-06 17:15生成)", fontsize=18, pad=40, fontweight='bold')
         ax.set_ylim(0, 100)
         ax.set_yticks([20, 40, 60, 80, 100])
         ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=12)
@@ -382,7 +404,7 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
         ax.set_xticklabels(categories_en, fontsize=13, fontweight='bold')
         title = 'ETF Overview Radar Chart\n△US-Related ●TW-Stock ■TW-Dividend'
     
-    ax.set_title(title, fontsize=18, pad=40, fontweight='bold')
+    ax.set_title(title + " (2026-01-06 17:15生成)", fontsize=18, pad=40, fontweight='bold')
     ax.set_ylim(0, 100)
     ax.set_yticks([20, 40, 60, 80, 100])
     ax.set_yticklabels(['20', '40', '60', '80', '100'], fontsize=10)
@@ -667,7 +689,7 @@ def generate_performance_chart(df_results, ret_1y_dict, ret_3y_dict, benchmark_d
         if us_etfs:
             _plot_2column_chart(us_etfs, etf_type_prefix, '_US', output_folder, 'US ETF')
         
-        print("✅ Chart generated successfully")
+        # print("✅ Chart generated successfully")
         
     except Exception as e:
         print(f"❌ Chart generation failed: {e}")
@@ -700,9 +722,13 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
                     ax.text(bar.get_x() + bar.get_width()/2., height,
                            f'{height:.1f}%', ha='center', va='bottom', fontsize=9, fontweight='bold')
         
-        ax.set_xlabel('ETF', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_ylabel('Return (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
-        ax.set_title(f'{title} Performance\n(Blue: 1-Year | Yellow: 3-Year)',
+        ax.set_xlabel('ETF名稱', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        ax.set_ylabel('報酬率（績效） (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
+        
+        # 生成中文標題與時間戳
+        chinese_title = f'{title} 年化報酬率（或績效）\n（藍色：1年 | 黃色：3年）'
+        title_with_timestamp = generate_chart_title_with_timestamp(chinese_title)
+        ax.set_title(title_with_timestamp,
                     fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
         ax.set_xticks(x)
         ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
@@ -838,16 +864,16 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         
         # 設定標題和標籤
         try:
-            plt.title('ETF vs 基準指數總覽 (基準點=100)\n紅線：台股加權 | 藍線：S&P500', 
-                     fontsize=16, fontweight='bold')
+            title = generate_chart_title_with_timestamp('ETF vs 基準指數總覽 (基準點=100)\n紅線：台股加權 | 藍線：S&P500')
+            plt.title(title + " (2026-01-06 17:15生成)", fontsize=16, fontweight='bold')
             plt.xlabel('日期', fontsize=12)
             plt.ylabel('相對淨值 (起始=100)', fontsize=12)
         except:
-            plt.title('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500', 
-                     fontsize=16, fontweight='bold')
+            title = generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500')
+            plt.title(title + " (2026-01-06 17:15生成)", fontsize=16, fontweight='bold')
             plt.xlabel('Date', fontsize=12)
             plt.ylabel('Relative NAV (Start=100)', fontsize=12)
-        
+            
         plt.grid(True, alpha=0.3)
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', 
                    fontsize=12, frameon=True, fancybox=True, shadow=True,
@@ -1012,7 +1038,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                 title = f'{category_name} 表現比較\n(各自起始點=100)'
                 ylabel = '相對淨值 (起始=100)'
             
-            plt.title(title, fontsize=14, fontweight='bold')
+            plt.title(title + " (2026-01-06 17:15生成)", fontsize=14, fontweight='bold')
             plt.xlabel('日期', fontsize=12)
             plt.ylabel(ylabel, fontsize=12)
         except:
@@ -1121,12 +1147,12 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
     print(f"  📏 實線/虛線: 區分主動型/被動型ETF")
 
 
-def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True):
+def plot_multi_metrics_comparison(df_results, etf_type_prefix="", output_folder=".", annualize=True):
     """繪製多指標柱狀圖：績效/年化報酬率、Alpha、Beta、夏普比率、MDD、標準差、費用率、追蹤誤差"""
     plt = setup_matplotlib_backend()
     setup_chinese_font()
 
-    print("\n📊 繪製多指標比較柱狀圖...")
+    # print("\n📊 繪製多指標比較柱狀圖...")
     
     # 決定績效列的名稱
     if annualize:
@@ -1229,7 +1255,7 @@ def plot_multi_metrics_comparison(df_results, etf_type_prefix="", annualize=True
     try:
         output_path = os.path.join(output_folder, f'{etf_type_prefix}etf_multi_metrics_comparison.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"\n✅ 多指標圖表已儲存: {output_path}")
+        # print(f"\n✅ 多指標圖表已儲存: {output_path}")
     except Exception as e:
         print(f"❌ 保存多指標圖表失敗: {e}")
     
@@ -1471,7 +1497,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
     
     # 繪製台股 ETF 圖表（_TW 版本）
     if taiwan_etfs:
-        print(f"\n  📊 生成台股 ETF 柱狀圖 (_TW)...")
+        # print(f"\n  📊 生成台股 ETF 柱狀圖 (_TW)...")
         fig, ax = plt.subplots(figsize=(16, 9))
         
         names = [item[0] for item in taiwan_etfs]
@@ -1514,7 +1540,8 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
                    f'{ret:.1f}%', ha='center', va='bottom',
                    fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         
-        ax.set_title('台股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        title_tw = generate_chart_title_with_timestamp('台股 ETF 三年年化報酬率比較 (含基準指數)')
+        ax.set_title(title_tw, fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_xticks(x_pos)
         
@@ -1540,11 +1567,9 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
         ax.grid(True, alpha=0.3, axis='y')
         ax.axhline(y=0, color='black', linestyle='-', linewidth=1)
         
-        # 在保存前添加時間戳到標題
-        from datetime import datetime
-        current_time = datetime.now().strftime('%Y%m%d %H:%M')
-        timestamp_title = f'台股 ETF 年化報酬率比較 (含基準) {current_time}生成'
-        ax.set_title(timestamp_title, fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        # 設置中文標題和時間戳
+        title_with_timestamp = generate_chart_title_with_timestamp("台股ETF年化報酬率比較")
+        ax.set_title(title_with_timestamp, fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         
         plt.tight_layout()
         
@@ -1612,7 +1637,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
                    f'{ret:.1f}%', ha='center', va='bottom',
                    fontsize=FONT_SIZE_CONFIG['label_medium'], fontweight='bold')
         
-        ax.set_title('美股 ETF 年化報酬率比較 (含基準)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
+        ax.set_title('美股 ETF 年化報酬率比較 (含基準) (2026-01-06 17:15生成)', fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold')
         ax.set_ylabel('3年年化報酬率 (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_xticks(x_pos)
         

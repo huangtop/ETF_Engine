@@ -1,16 +1,20 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from matplotlib.font_manager import FontProperties
 import platform
-from data_fetcher import download_price_data, set_alpha_vantage_key
+import time
 import os
 import sys
 import warnings
 import signal
-from generate_all_charts import generate_performance_chart
+from data_fetcher import download_price_data, set_alpha_vantage_key
+from generate_all_charts import generate_performance_chart, plot_turnover_bar, plot_radar_chart, plot_price_trend, plot_multi_metrics_comparison
+from font_config import setup_chinese_font_enhanced, update_font_sizes, FONT_SIZE_CONFIG
+from config_loader import load_etf_config
 
 # 抑制警告
 warnings.filterwarnings('ignore')
@@ -27,13 +31,8 @@ signal.alarm(1800)  # 30 分鐘
 os.environ['MPLBACKEND'] = 'Agg'
 
 # 確保 matplotlib 使用正確後端
-import matplotlib
 matplotlib.use('Agg', force=True)
 plt.ioff()  # 關閉互動模式
-
-# 導入改進的字體配置
-from font_config import setup_chinese_font_enhanced, update_font_sizes, FONT_SIZE_CONFIG
-from config_loader import load_etf_config
 
 # 設置中文字體和字體大小
 setup_chinese_font_enhanced()
@@ -287,11 +286,8 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         annualize: 是否年化報酬率（True=年化，False=實績）
     """
     try:
-        print(f"開始分析 {ticker}...")
-        
         # 清理ticker格式
         clean_ticker = ticker.strip()
-        print(f"  清理後的ticker: '{clean_ticker}'")
         
         # 下載完整歷史資料（用於計算 1 年和 3 年報酬率）
         df_full = download_price_data(clean_ticker, start_date='2015-01-01', end_date=end_date, config_type=config_type)
@@ -400,7 +396,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         expense = expense_ratio_dict.get(clean_ticker, 'N/A')
 
         cagr_pct = cagr * 100 if not pd.isna(cagr) else 0
-        print(f"{clean_ticker} 分析完成 - 期間: {data_years:.2f}年, CAGR: {cagr_pct:.2f}%")
+        # 移除個別 ETF 分析完成訊息
         
         # 計算 Alpha 和 Beta
         alpha, beta = np.nan, np.nan
@@ -409,7 +405,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             # 最少需要 5 個交易日，這樣才有足夠的變異來計算相關係數
             if len(returns) >= 5:
                 alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
-                print(f"  ✅ {clean_ticker} Alpha/Beta 計算完成")
+                    # Alpha/Beta 計算完成（移除輸出）
             else:
                 print(f"⚠️  {clean_ticker} 數據點不足 ({len(returns)} 天)，跳過 Alpha/Beta 計算")
         
@@ -592,7 +588,12 @@ if __name__ == '__main__':
             benchmark_returns = None
         
         # 美股基準 - S&P 500（用於視覺化比較）
-        sp500_df = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date, config_type=config_type)
+        print("  ⚡ 快速檢查美股數據可用性...")
+        try:
+            sp500_df = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date, config_type=config_type)
+        except Exception as e:
+            print(f"  ⚠️  跳過美股數據（API 不可用）: {e}")
+            sp500_df = pd.DataFrame()
         if not sp500_df.empty:
             sp500_prices = sp500_df['Close']
             if isinstance(sp500_prices, pd.DataFrame):
@@ -608,7 +609,14 @@ if __name__ == '__main__':
         sp500_returns = None
     
     # 3. 分析所有ETF
-    print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
+    # print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
+    results = []
+    
+    # 對於 active_etf，不進行年化；其他類型進行年化
+    should_annualize = (config_type != 'active_etf')
+    
+    # 3. 分析所有ETF（恢復順序執行）
+    # print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
     results = []
     
     # 對於 active_etf，不進行年化；其他類型進行年化
@@ -627,6 +635,8 @@ if __name__ == '__main__':
         data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate, config, config_type, annualize=should_annualize)
         if data:
             results.append(data)
+    
+    print(f"✅ 順序分析完成：{len(results)} 支ETF")
     
     # 4. 顯示結果
     if results:
@@ -743,48 +753,66 @@ if __name__ == '__main__':
             
         print(f"{'='*60}")
 
-        # 5. 視覺化（修復參數傳入）
+        # 5. 視覺化（恢復順序執行版本）
+        start_viz_time = time.time()
+        
+        # 簡化預計算（只處理 ETF 字典）
+        etf_dict = {}
+        for item in etf_list:
+            if isinstance(item, dict):
+                ticker = item.get('ticker', '')
+                name = item.get('name', '')
+            else:
+                ticker = item[0] if len(item) > 0 else ''
+                name = item[1] if len(item) > 1 else ''
+            if ticker and name:
+                etf_dict[ticker] = name
+        
         try:
+            # print("🎨 開始順序生成圖表...")
+            
+            # 快速生成條形圖
             turnover_chart = plot_turnover_bar(df_results)
-            print("\nChart.js 條形圖配置（換手率）：")
-            print(turnover_chart)
+            # print("✅ 換手率條形圖完成")
             
-            # 正確解析 ETF 列表格式
-            etf_dict = {}
-            for item in etf_list:
-                if isinstance(item, dict):
-                    ticker = item.get('ticker', '')
-                    name = item.get('name', '')
-                else:
-                    ticker = item[0] if len(item) > 0 else ''
-                    name = item[1] if len(item) > 1 else ''
-                if ticker and name:
-                    etf_dict[ticker] = name
-            
-            # 現在傳入所有必要參數
+            # 順序執行圖表生成
+            # print("🎨 生成價格趨勢圖...")
             plot_price_trend(etf_dict, config, common_start_date, latest_date, etf_type_prefix, output_folder)
+            # print("✅ 價格趨勢圖完成")
+            
+            # print("🎨 生成雷達圖...")
             plot_radar_chart(df_results, config, etf_type_prefix, output_folder)
-            print("\n✅ 圖表生成完成")
+            # print("✅ 雷達圖完成")
+            
+            # print("🎨 生成多指標比較圖...")
+            plot_multi_metrics_comparison(df_results, etf_type_prefix, output_folder)
+            # print("✅ 多指標圖完成")
+            
+            viz_time = time.time() - start_viz_time
+            # print(f"🎯 順序圖表生成完成 ({viz_time:.1f}秒)")
+            
         except Exception as e:
             print(f"⚠️  圖表生成失敗: {e}")
             import traceback
             traceback.print_exc()
-        print("\n折線圖已儲存為 etf_price_trend.png")
-        print("雷達圖已儲存為 etf_radar_chart.png")
+        # print("\n折線圖已儲存為 etf_price_trend.png")
+        # print("雷達圖已儲存為 etf_radar_chart.png")
 
         print("\n📊 正在生成視覺化圖表...")
         
-        # 修正字體問題的視覺化
-        skip_plots = os.getenv('SKIP_PLOTS', '0') == '1'
-        
-        if not skip_plots:
-            print("\n🎨 Generate charts...")
-            try:
-                generate_performance_chart(df_results, ret_1y_dict, ret_3y_dict, None, etf_type_prefix, output_folder)
-                print("  ✅ Chart completed")
-            except Exception as e:
-                print(f"  ❌ Chart failed: {e}")
-        else:
-            print("\n⏭️  跳過圖表生成（SKIP_PLOTS=1）")
+        # 生成圖表
+        # print("\n🎨 Generate charts...")
+        try:
+            generate_performance_chart(df_results, ret_1y_dict, ret_3y_dict, None, etf_type_prefix, output_folder)
+            # print("  ✅ Chart completed")
+            
+            # 為所有圖表標題添加時間戳
+            # print("  🕒 添加圖表時間戳...")
+            from add_timestamp_to_titles import add_timestamps_to_all_charts
+            add_timestamps_to_all_charts('generate_all_charts.py')
+            # print("  ✅ 時間戳添加完成")
+            
+        except Exception as e:
+            print(f"  ❌ Chart failed: {e}")
     else:
         print("沒有成功分析的ETF資料")

@@ -1,6 +1,10 @@
 """
 股價資料獲取模組
-使用 TWSE（台股）和 Alpha Vantage（美股）作為資料來源
+使用 TWSE（台股）和 Alp        try:
+            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            return {}ge（美股）作為資料來源
 包含智能快取機制，避免重複調用 API
 """
 
@@ -19,10 +23,9 @@ CACHE_DIR = 'cache'
 CACHE_FILE = os.path.join(CACHE_DIR, 'alpha_vantage_cache.json')
 CACHE_VALIDITY_DAYS = 7  # 快取有效期（天）
 
-# 確保快取目錄存在
+# 確保快取目錄存在（靜默）
 if not os.path.exists(CACHE_DIR):
     os.makedirs(CACHE_DIR)
-    print(f"✅ 創建快取目錄: {CACHE_DIR}")
 
 
 def load_cache():
@@ -79,7 +82,7 @@ def fetch_twse_price(ticker, start_date, end_date):
     ticker_clean = ticker.replace('.TW', '').strip()
     
     try:
-        print(f"  📥 從 TWSE 官方 API 下載 {ticker} 股價...")
+        # print(f"  📥 從 TWSE 官方 API 下載 {ticker} 股價...")
         
         all_data = []
         start_date_dt = pd.to_datetime(start_date)
@@ -102,7 +105,7 @@ def fetch_twse_price(ticker, start_date, end_date):
             }
             
             try:
-                response = requests.get(url, params=params, timeout=10, verify=False)
+                response = requests.get(url, params=params, timeout=2, verify=False)  # 進一步優化到 2 秒
                 data = response.json()
                 
                 if data.get('data'):
@@ -216,7 +219,7 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
             'apikey': api_key
         }
         
-        response = requests.get(url, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=3)  # 從 10 秒改為 3 秒
         data = response.json()
         
         # 檢查 API 錯誤
