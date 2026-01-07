@@ -87,12 +87,12 @@ def _is_benchmark_cache_valid(cached_item):
 
 def get_benchmark_data(symbol, start_date, end_date, name=None):
     """
-    獲取基準數據，全局快取跨ETF類型共享
+    獲取基準數據（支持跨ETF類型、跨程序執行的持久化快取）
     
     遠端執行時，三種ETF類型依次執行：
-    1. 主動式ETF → 下載基準數據
-    2. 高股息ETF → 復用已下載的基準數據 ⚡
-    3. 產業型ETF → 復用已下載的基準數據 ⚡
+    1. 主動式ETF → 下載基準數據 → 保存文件快取
+    2. 高股息ETF → 從文件快取復用 ⚡
+    3. 產業型ETF → 從文件快取復用 ⚡
     
     Args:
         symbol: 基準代碼 (如 '^GSPC', 'VOO', '0050.TW')
@@ -105,6 +105,23 @@ def get_benchmark_data(symbol, start_date, end_date, name=None):
     """
     cache_key = f"{symbol}_{start_date}_{end_date}"
     display_name = name or symbol
+    
+    # 🚀 優先檢查文件快取（跨程序執行持久化）
+    file_cache = _load_benchmark_cache()
+    if cache_key in file_cache and _is_benchmark_cache_valid(file_cache[cache_key]):
+        print(f"📁 從文件快取復用: {display_name} ({symbol})")
+        try:
+            cached_data = file_cache[cache_key]['data']
+            # 重建 pandas Series
+            if isinstance(cached_data, dict) and 'index' in cached_data and 'values' in cached_data:
+                prices = pd.Series(
+                    data=cached_data['values'], 
+                    index=pd.to_datetime(cached_data['index'])
+                )
+                _benchmark_cache[cache_key] = prices  # 同時更新內存快取
+                return prices
+        except Exception as e:
+            print(f"⚠️ 文件快取恢復失敗: {e}")
     
     if cache_key not in _benchmark_cache:
         print(f"📥 下載基準數據: {display_name} ({symbol})")
@@ -120,7 +137,26 @@ def get_benchmark_data(symbol, start_date, end_date, name=None):
                     _benchmark_cache[cache_key] = prices
                 else:
                     _benchmark_cache[cache_key] = data
+                    prices = data
+                    
                 print(f"✅ {display_name} 基準數據已快取 ({len(_benchmark_cache[cache_key])} 天)")
+                
+                # 🚀 同時保存到文件快取
+                try:
+                    file_cache[cache_key] = {
+                        'timestamp': datetime.now().isoformat(),
+                        'symbol': symbol,
+                        'name': display_name,
+                        'data': {
+                            'index': prices.index.astype(str).tolist(),
+                            'values': prices.values.tolist()
+                        }
+                    }
+                    _save_benchmark_cache(file_cache)
+                    print(f"💾 {display_name} 已保存到文件快取")
+                except Exception as e:
+                    print(f"⚠️ 文件快取保存失敗: {e}")
+                    
             else:
                 _benchmark_cache[cache_key] = None
                 print(f"❌ {display_name} 數據為空")
@@ -128,7 +164,7 @@ def get_benchmark_data(symbol, start_date, end_date, name=None):
             print(f"❌ {display_name} 下載失敗: {e}")
             _benchmark_cache[cache_key] = None
     else:
-        print(f"💾 復用快取: {display_name} ({symbol})")
+        print(f"💾 復用內存快取: {display_name} ({symbol})")
     
     return _benchmark_cache[cache_key]
 

@@ -451,12 +451,12 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         alpha, beta = np.nan, np.nan
         if benchmark_returns is not None and len(benchmark_returns) > 0:
             # 只有當 ETF 有足夠的數據點時才計算 Alpha/Beta
-            # 最少需要 5 個交易日，這樣才有足夠的變異來計算相關係數
-            if len(returns) >= 5:
+            # 最少需要 30 個交易日，確保統計可靠性
+            if len(returns) >= 30:
                 alpha, beta = calculate_alpha_beta(returns, benchmark_returns, risk_free_rate)
                     # Alpha/Beta 計算完成（移除輸出）
             else:
-                print(f"⚠️  {clean_ticker} 數據點不足 ({len(returns)} 天)，跳過 Alpha/Beta 計算")
+                print(f"⚠️  {clean_ticker} 數據點不足 ({len(returns)} 天<30天)，跳過 Alpha/Beta 計算")
         
         # 從 etf_list 中查找 ETF 名稱（支持對象和數組格式）
         etf_name = '未知'
