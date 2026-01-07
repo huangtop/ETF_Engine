@@ -48,6 +48,17 @@ jobs:
           echo "🔍 可用中文字體："
           fc-list :lang=zh | head -5 || echo "未找到中文字體"
 
+      - name: Cache ETF and benchmark data
+        uses: actions/cache@v3
+        with:
+          path: |
+            price_cache/
+            cache/
+          key: etf-data-cache-${{ hashFiles('etf_configs/*.json') }}-${{ github.run_date }}
+          restore-keys: |
+            etf-data-cache-${{ hashFiles('etf_configs/*.json') }}-
+            etf-data-cache-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
