@@ -40,9 +40,20 @@ CACHE_VALIDITY_DAYS = 7  # 快取有效期（天）
 if not os.path.exists(CACHE_DIR):
     os.makedirs(CACHE_DIR)
 
+def is_local_environment():
+    """檢查是否為本地環境（非 GitHub Actions）"""
+    return not os.getenv('GITHUB_ACTIONS', False)
+
+def should_use_cache():
+    """決定是否使用快取機制 - 只在本地環境使用"""
+    return is_local_environment()
+
 
 def load_cache():
-    """從 JSON 檔案讀取快取"""
+    """從 JSON 檔案讀取快取（僅限本地環境）"""
+    if not should_use_cache():
+        return {}
+    
     if os.path.exists(CACHE_FILE):
         try:
             with open(CACHE_FILE, 'r', encoding='utf-8') as f:
@@ -56,7 +67,10 @@ def load_cache():
 
 
 def save_cache(cache):
-    """將快取寫入 JSON 檔案"""
+    """將快取寫入 JSON 檔案（僅限本地環境）"""
+    if not should_use_cache():
+        return
+    
     try:
         with open(CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache, f, indent=2, ensure_ascii=False)
@@ -424,7 +438,7 @@ def download_price_data(ticker, start_date, end_date, api_key=None, config_type=
     """
     統一的股價下載函數
     自動判斷是台股還是美股，使用對應的資料來源
-    包含智能快取機制，避免重複下載相同數據
+    包含智能快取機制，避免重複下載相同數據（僅限本地環境）
     
     Args:
         ticker: 股票代碼
@@ -437,32 +451,36 @@ def download_price_data(ticker, start_date, end_date, api_key=None, config_type=
         pd.DataFrame: OHLCV 資料
     """
     
-    # CSV 快取邏輯 - 按配置類型和日期範圍分開儲存
-    from pathlib import Path
-    cache_dir = Path('price_cache') / config_type
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    # 🔧 只在本地環境使用快取機制
+    if should_use_cache():
+        # CSV 快取邏輯 - 按配置類型和日期範圍分開儲存
+        from pathlib import Path
+        cache_dir = Path('price_cache') / config_type
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 快取檔名包含股票代碼和日期範圍
+        cache_filename = f"{ticker}_{start_date}_to_{end_date}.csv"
+        cache_file = cache_dir / cache_filename
+        
+        # 檢查今日是否已有快取（同一天測試用同一份資料）
+        if cache_file.exists():
+            try:
+                # 檢查檔案修改時間是否為今天
+                file_mtime = datetime.fromtimestamp(cache_file.stat().st_mtime)
+                today = datetime.now().date()
+                
+                if file_mtime.date() == today:
+                    df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+                    print(f"  📦 使用今日快取: {ticker} ({len(df)} 天)")
+                    return df
+                else:
+                    print(f"  🔄 快取過期 ({file_mtime.date()} != {today})，重新下載...")
+            except Exception as e:
+                print(f"  ⚠️  快取讀取失敗: {e}，重新下載...")
+    else:
+        print(f"  🌐 遠端環境，跳過快取直接下載: {ticker}")
     
-    # 快取檔名包含股票代碼和日期範圍
-    cache_filename = f"{ticker}_{start_date}_to_{end_date}.csv"
-    cache_file = cache_dir / cache_filename
-    
-    # 檢查今日是否已有快取（同一天測試用同一份資料）
-    if cache_file.exists():
-        try:
-            # 檢查檔案修改時間是否為今天
-            file_mtime = datetime.fromtimestamp(cache_file.stat().st_mtime)
-            today = datetime.now().date()
-            
-            if file_mtime.date() == today:
-                df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
-                print(f"  📦 使用今日快取: {ticker} ({len(df)} 天)")
-                return df
-            else:
-                print(f"  🔄 快取過期 ({file_mtime.date()} != {today})，重新下載...")
-        except Exception as e:
-            print(f"  ⚠️  快取讀取失敗: {e}，重新下載...")
-    
-    # 快取不存在或過期，重新下載
+    # 快取不存在/過期/遠端環境，重新下載
     if is_us_stock(ticker):
         # 美股或指數 → Alpha Vantage
         df = fetch_us_stock_price(ticker, start_date, end_date, api_key)
@@ -470,8 +488,8 @@ def download_price_data(ticker, start_date, end_date, api_key=None, config_type=
         # 台股 → TWSE
         df = fetch_twse_price(ticker, start_date, end_date)
     
-    # 保存到快取（只有成功下載才快取）
-    if df is not None and not df.empty:
+    # 保存到快取（只有本地環境且成功下載才快取）
+    if should_use_cache() and df is not None and not df.empty:
         try:
             df.to_csv(cache_file)
             print(f"  💾 已快取: {ticker} → {cache_file}")
