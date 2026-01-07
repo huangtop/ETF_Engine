@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 180
+    timeout-minutes: 120
     
     steps:
       - name: Checkout code
@@ -47,16 +47,6 @@ jobs:
           # 檢查中文字體
           echo "🔍 可用中文字體："
           fc-list :lang=zh | head -5 || echo "未找到中文字體"
-
-      - name: Cache Price Data
-        uses: actions/cache@v3
-        with:
-          path: |
-            price_cache/
-            cache/
-          key: etf-price-cache-${{ github.run_number }}
-          restore-keys: |
-            etf-price-cache-
 
       - name: Install dependencies
         run: |
