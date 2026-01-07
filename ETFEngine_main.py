@@ -535,40 +535,6 @@ def setup_chinese_font():
     pass
 
 
-def plot_turnover_bar(df_results):
-    """繪製換手率條形圖（Chart.js 格式）"""
-    labels = df_results['名稱'].tolist()
-    turnover = [float(x) if x != 'N/A' else 0 for x in df_results['換手率 (%)']]
-    return {
-        "type": "bar",
-        "data": {
-            "labels": labels,
-            "datasets": [{
-                "label": "換手率 (%)",
-                "data": turnover,
-                "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#C9CBCF", "#7BC225", "#FF5733", "#C70039", "#900C3F"],
-                "borderColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40", "#C9CBCF", "#7BC225", "#FF5733", "#C70039", "#900C3F"],
-                "borderWidth": 1
-            }]
-        },
-        "options": {
-            "scales": {
-                "y": {
-                    "beginAtZero": True,
-                    "title": {"display": True, "text": "換手率 (%)"}
-                },
-                "x": {
-                    "title": {"display": True, "text": "ETF 名稱"}
-                }
-            },
-            "plugins": {
-                "legend": {"display": False},
-                "title": {"display": True, "text": "ETF 換手率比較"}
-            }
-        }
-    }
-
-
 
 if __name__ == '__main__':
     import sys

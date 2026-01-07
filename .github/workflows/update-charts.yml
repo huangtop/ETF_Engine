@@ -53,6 +53,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Cache ETF price data
+        uses: actions/cache@v3
+        with:
+          path: |
+            price_cache/
+            cache/
+          key: etf-price-data-${{ github.run_number }}
+          restore-keys: |
+            etf-price-data-
+
       - name: Generate Active ETF Charts
         env:
           MPLBACKEND: Agg
