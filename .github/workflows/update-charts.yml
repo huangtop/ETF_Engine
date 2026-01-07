@@ -2,8 +2,23 @@ name: Weekly Update ETF Charts
 
 on:
   push:
-    branches: [ main ]
-  schedule:
+    branches: [ main       - name: Generate Active ETF Charts  
+       - name: Generate Industry ETF Charts
+        timeout-minutes: 60  # 產業型ETF中等複雜度
+        env:
+          MPLBACKEND: Agg  
+          LANG: zh_TW.UTF-8
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        run: |
+          echo "🏭 生成產業型ETF圖表..."
+          python ETFEngine_main.py industry_etfimeout-minutes: 30  # 主動式ETF純台股，較快
+        env:
+          MPLBACKEND: Agg
+          LANG: zh_TW.UTF-8
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+        run: |
+          echo "🎯 生成主動式ETF圖表..."
+          python ETFEngine_main.py active_etfdule:
     # 每週一凌晨 2 點 (UTC)
     - cron: '0 2 * * 1'
   # 允許手動觸發
@@ -82,6 +97,7 @@ jobs:
         continue-on-error: true
 
       - name: Generate High Dividend ETF Charts
+        timeout-minutes: 90  # 高股息ETF有美股依賴，需要更多時間
         env:
           MPLBACKEND: Agg
           LANG: zh_TW.UTF-8

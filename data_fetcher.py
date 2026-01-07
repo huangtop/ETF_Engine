@@ -18,6 +18,19 @@ import time
 # Alpha Vantage API key（從環境變數讀取，不寫到程式中）
 ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY', 'demo')
 
+# 🚨 全局Alpha Vantage API失敗標記
+_ALPHA_VANTAGE_FAILED = False
+
+def mark_alpha_vantage_failed():
+    """標記Alpha Vantage API為失敗狀態，後續調用將被跳過"""
+    global _ALPHA_VANTAGE_FAILED
+    _ALPHA_VANTAGE_FAILED = True
+    print("⚡ Alpha Vantage API 標記為失敗，後續美股數據調用將被跳過")
+
+def is_alpha_vantage_failed():
+    """檢查Alpha Vantage API是否已被標記為失敗"""
+    return _ALPHA_VANTAGE_FAILED
+
 # 快取設定
 CACHE_DIR = 'cache'
 CACHE_FILE = os.path.join(CACHE_DIR, 'alpha_vantage_cache.json')
@@ -105,7 +118,7 @@ def fetch_twse_price(ticker, start_date, end_date):
             }
             
             try:
-                response = requests.get(url, params=params, timeout=0.5, verify=False)  # GitHub Actions 專用：超級快速失敗
+                response = requests.get(url, params=params, timeout=0.2, verify=False)  # 200毫秒超時 - 極速失敗
                 data = response.json()
                 
                 if data.get('data'):
@@ -175,6 +188,11 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
         pd.DataFrame: OHLCV 資料，index 為日期
     """
     
+    # 🚨 檢查Alpha Vantage API是否已被標記為失敗
+    if is_alpha_vantage_failed():
+        print(f"  🚫 跳過 {symbol} - Alpha Vantage API 已標記為失敗")
+        return pd.DataFrame()
+    
     if api_key is None:
         api_key = ALPHA_VANTAGE_API_KEY
     
@@ -219,21 +237,31 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
             'apikey': api_key
         }
         
-        response = requests.get(url, params=params, timeout=5)  # 遠端環境：增加到5秒避免頻繁失敗
+        response = requests.get(url, params=params, timeout=0.2)  # 200毫秒超時 - 立刻放棄
         data = response.json()
         
+        # 🚀 快速檢查 - 如果API有問題立刻放棄
+        if not isinstance(data, dict):
+            print(f"  ❌ {symbol} API 回應格式錯誤，立刻放棄")
+            return pd.DataFrame()
+            
         # 檢查 API 錯誤
         if 'Error Message' in data:
-            print(f"  ❌ {symbol} API 錯誤: {data['Error Message']}")
+            print(f"  ❌ {symbol} API 錯誤: {data['Error Message']}，立刻放棄")
             return pd.DataFrame()
         
         if 'Note' in data:
-            print(f"  ⚠️  {symbol} API 限制: {data['Note']}")
+            print(f"  ❌ {symbol} API 限制: {data['Note']}，立刻放棄")
+            return pd.DataFrame()
+            
+        # 檢查關鍵字段 - Information 表示API配額問題
+        if 'Information' in data:
+            print(f"  ❌ {symbol} API 配額問題，立刻放棄")
             return pd.DataFrame()
         
         if 'Time Series (Daily)' not in data:
-            print(f"  ❌ {symbol} 無法從 Alpha Vantage 獲取資料（可能是無效代碼或 API 額度用盡）")
-            print(f"     回應: {list(data.keys())[:3]}")
+            print(f"  ❌ {symbol} 無資料或API問題，立刻放棄")
+            print(f"     回應鍵: {list(data.keys())[:3]}")
             return pd.DataFrame()
         
         # 轉換為 DataFrame
@@ -279,13 +307,20 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
         return df
         
     except requests.exceptions.Timeout:
-        print(f"  ❌ {symbol} 下載逾時（API 反應緩慢）")
+        print(f"  ⚡ {symbol} API 超時 (0.2秒) - 標記全局失敗")
+        mark_alpha_vantage_failed()
+        return pd.DataFrame()
+    except requests.exceptions.ConnectionError:
+        print(f"  ⚡ {symbol} 連線錯誤 - 標記全局失敗")
+        mark_alpha_vantage_failed()
         return pd.DataFrame()
     except requests.exceptions.RequestException as e:
-        print(f"  ❌ {symbol} 網路錯誤: {e}")
+        print(f"  ⚡ {symbol} 網路錯誤 - 標記全局失敗: {e}")
+        mark_alpha_vantage_failed()
         return pd.DataFrame()
     except Exception as e:
-        print(f"  ❌ {symbol} 下載失敗: {e}")
+        print(f"  ⚡ {symbol} API 失敗 - 標記全局失敗: {e}")
+        mark_alpha_vantage_failed()
         return pd.DataFrame()
 
 
