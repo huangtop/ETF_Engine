@@ -57,6 +57,7 @@ jobs:
         env:
           MPLBACKEND: Agg
           LANG: zh_TW.UTF-8
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
         run: |
           echo "🚀 生成主動式ETF圖表..."
           python ETFEngine_main.py active_etf
@@ -74,6 +75,7 @@ jobs:
         env:
           MPLBACKEND: Agg
           LANG: zh_TW.UTF-8
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
         run: |
           echo "💰 生成高股息ETF圖表..."
           python ETFEngine_main.py high_dividend_etf
@@ -91,6 +93,7 @@ jobs:
         env:
           MPLBACKEND: Agg
           LANG: zh_TW.UTF-8
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
         run: |
           echo "🏭 生成產業型ETF圖表..."
           python ETFEngine_main.py industry_etf

@@ -219,7 +219,7 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
             'apikey': api_key
         }
         
-        response = requests.get(url, params=params, timeout=0.5)  # GitHub Actions 專用：1秒超時
+        response = requests.get(url, params=params, timeout=5)  # 遠端環境：增加到5秒避免頻繁失敗
         data = response.json()
         
         # 檢查 API 錯誤

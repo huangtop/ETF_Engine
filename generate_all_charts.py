@@ -36,6 +36,32 @@ FONT_SIZE_CONFIG = {
     'figure_text': 12,        # 图表说明文字
 }
 
+# 全局基準數據快取 - 避免重複下載美股基準數據
+_benchmark_cache = {}
+
+def get_benchmark_data(symbol, start_date, end_date):
+    """獲取基準數據，避免重複下載 - 解決高股息ETF遠端超慢問題"""
+    cache_key = f"{symbol}_{start_date}_{end_date}"
+    
+    if cache_key not in _benchmark_cache:
+        print(f"📥 首次下載基準數據: {symbol}")
+        try:
+            from data_fetcher import download_price_data
+            data = download_price_data(symbol, start_date=start_date, end_date=end_date)
+            if not data.empty:
+                _benchmark_cache[cache_key] = data
+                print(f"✅ 基準數據已快取: {symbol}")
+            else:
+                _benchmark_cache[cache_key] = None
+                print(f"❌ 基準數據為空: {symbol}")
+        except Exception as e:
+            print(f"❌ 基準數據下載失敗: {symbol} - {e}")
+            _benchmark_cache[cache_key] = None
+    else:
+        print(f"💾 使用快取基準數據: {symbol}")
+    
+    return _benchmark_cache[cache_key]
+
 def generate_chart_title_with_timestamp(base_title):
     """生成帶有時間戳的圖表標題"""
     from datetime import datetime
@@ -761,18 +787,36 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
 
 def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix="", output_folder="."):
     """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）
-    
-    Args:
-        etf_list: ETF 列表
-        config: ETF 配置
-        common_start_date: 統一的起始日期
-        latest_date: 結束日期
-        etf_type_prefix: ETF 類型前綴
-        output_folder: 輸出資料夾路徑
-        etf_type_prefix: ETF 類型前綴（如 "Active_", "HighDividend_", "Industry_"）
+    ⚡ 優化版：全局快取基準數據，避免重複下載
     """
     plt = setup_matplotlib_backend()
     setup_chinese_font()
+    
+    # 🚀 全局基準數據快取（避免重複下載）
+    global_benchmark_cache = {}
+    
+    def get_cached_benchmark(symbol, name, start_date, end_date):
+        """獲取快取的基準數據"""
+        cache_key = f"{symbol}_{start_date}_{end_date}"
+        if cache_key not in global_benchmark_cache:
+            print(f"📥 下載基準數據: {name} ({symbol}) [{start_date} to {end_date}]")
+            try:
+                data = download_price_data(symbol, start_date=start_date, end_date=end_date)
+                if not data.empty:
+                    prices = data['Close']
+                    if isinstance(prices, pd.DataFrame):
+                        prices = prices.iloc[:, 0]
+                    global_benchmark_cache[cache_key] = prices
+                    print(f"✅ {name} 基準數據已快取 ({len(prices)} 天)")
+                else:
+                    global_benchmark_cache[cache_key] = None
+                    print(f"❌ {name} 數據為空")
+            except Exception as e:
+                global_benchmark_cache[cache_key] = None
+                print(f"❌ {name} 下載失敗: {e}")
+        else:
+            print(f"💾 使用快取: {name} ({symbol})")
+        return global_benchmark_cache[cache_key]
     
     # 從 etf_list 提取信息（支持對象和數組格式）
     etf_info = {}
@@ -836,13 +880,9 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             print(f"台灣50下載失敗: {e}")
         
         try:
-            # 美股基準 - S&P 500
-            print("正在下載美股基準指數...")
-            sp500_index = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date)
-            if not sp500_index.empty:
-                sp500_prices = sp500_index['Close']
-                if isinstance(sp500_prices, pd.DataFrame):
-                    sp500_prices = sp500_prices.iloc[:, 0]
+            # 美股基準 - S&P 500 (使用快取)
+            sp500_prices = get_cached_benchmark('^GSPC', 'S&P 500指數', common_start_date, latest_date)
+            if sp500_prices is not None:
                 sp500_normalized = (sp500_prices / sp500_prices.iloc[0]) * 100
                 plt.plot(sp500_normalized.index, sp500_normalized, 
                         label='S&P 500指數', linewidth=3, color='#0000FF', 
@@ -1483,23 +1523,36 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
                 ret_006208 = float(total_ret_006208)
                 benchmark_data['006208'] = ('006208 富邦台50', ret_006208)
         
-        # 美股基準（也使用相同時間範圍和計算方式）
+        # 美股基準（使用簡單快取避免重複下載）
         if us_etfs:
-            voo = download_price_data('VOO', start_date=bench_start_date, end_date=latest_date)
-            sp500 = download_price_data('^GSPC', start_date=bench_start_date, end_date=latest_date)
+            # 檢查是否已經下載過
+            if 'voo_data' not in locals():
+                print("📥 下載VOO基準數據...")
+                voo = download_price_data('VOO', start_date=bench_start_date, end_date=latest_date)
+                voo_data = voo
+            else:
+                print("💾 使用已下載的VOO數據")
+                
+            if 'sp500_data' not in locals():
+                print("📥 下載S&P500基準數據...")
+                sp500 = download_price_data('^GSPC', start_date=bench_start_date, end_date=latest_date)
+                sp500_data = sp500
+            else:
+                print("💾 使用已下載的S&P500數據")
             
-            if isinstance(voo, pd.DataFrame) and not voo.empty:
-                years_voo = len(voo['Close']) / 252
-                total_ret_voo = ((voo['Close'].iloc[-1] / voo['Close'].iloc[0]) - 1) * 100
+            if isinstance(voo_data, pd.DataFrame) and not voo_data.empty:
+                years_voo = len(voo_data['Close']) / 252
+                total_ret_voo = ((voo_data['Close'].iloc[-1] / voo_data['Close'].iloc[0]) - 1) * 100
                 
                 if bench_annualize and years_voo >= 1.0:
                     ret_voo = float(((1 + total_ret_voo/100) ** (1 / years_voo) - 1) * 100) if years_voo > 0 else total_ret_voo
                 else:
                     ret_voo = float(total_ret_voo)
                 benchmark_data['VOO'] = ('VOO S&P500', ret_voo)
-            elif isinstance(sp500, pd.DataFrame) and not sp500.empty:
-                years_sp500 = len(sp500['Close']) / 252
-                total_ret_sp500 = ((sp500['Close'].iloc[-1] / sp500['Close'].iloc[0]) - 1) * 100
+                
+            elif isinstance(sp500_data, pd.DataFrame) and not sp500_data.empty:
+                years_sp500 = len(sp500_data['Close']) / 252
+                total_ret_sp500 = ((sp500_data['Close'].iloc[-1] / sp500_data['Close'].iloc[0]) - 1) * 100
                 
                 if bench_annualize and years_sp500 >= 1.0:
                     ret_sp500 = float(((1 + total_ret_sp500/100) ** (1 / years_sp500) - 1) * 100) if years_sp500 > 0 else total_ret_sp500

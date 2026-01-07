@@ -8,6 +8,11 @@ __pycache__/
 dist/
 build/
 
+# 環境變數文件（重要！保護 API keys）
+.env
+.env.local
+.env.*.local
+
 # IDE
 .vscode/
 .idea/
