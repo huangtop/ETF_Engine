@@ -292,22 +292,41 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
     tw_dividend_etfs = []
     
     for _, row in df_results.iterrows():
+        # 🔧 檢查數據天數，排除不可靠的數據
+        data_days = row.get('數據天數', 0)
+        if data_days < 30:  # 數據不足30天，跳過分類
+            print(f"⚠️  雷達圖排除 {row['證券代碼']} - 數據不足 ({data_days} 天 < 30天)")
+            continue
+            
         ticker = row['證券代碼'].strip()
         name = row['名稱'].strip()
-        etf_type = config.get('etf_type', {}).get(ticker) if config else None
+        
+        # 🔧 從config的etf_list中查找type（不是etf_type）
+        etf_type = None
+        if config and 'etf_list' in config:
+            for etf in config['etf_list']:
+                if etf.get('ticker') == ticker:
+                    etf_type = etf.get('type')
+                    break
         
         if etf_type == 'us':
             us_etfs.append(row)
         elif etf_type == 'dividend':
             tw_dividend_etfs.append(row)
         else:
-            # 預設為 taiwan_stock
+            # 預設為台股股票型（包含 tw_active 和其他台股ETF）
             tw_stock_etfs.append(row)
     
-    # 收集數據範圍（雷達圖強制使用1年數據）
+    # 收集數據範圍（雷達圖強制使用1年數據，但排除數據不足的ETF）
     all_returns, all_sharpe, all_vol, all_dd, all_te = [], [], [], [], []
     
     for _, row in df_results.iterrows():
+        # 🔧 檢查數據天數，排除不可靠的數據
+        data_days = row.get('數據天數', 0)
+        if data_days < 30:  # 數據不足30天，跳過
+            print(f"⚠️  雷達圖排除 {row['證券代碼']} - 數據不足 ({data_days} 天 < 30天)")
+            continue
+            
         # 使用1年年化報酬率
         if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A':
             all_returns.append(float(row.get('1年年化報酬率 (%)', 'N/A')))
@@ -1146,7 +1165,10 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         benchmark_data = None
         try:
             print(f"📊 下載{benchmark_name}基準資料...")
+            
+            # 使用統一的基準數據下載機制
             benchmark_df = download_price_data(benchmark_ticker, start_date=comparison_start_date, end_date=latest_date)
+                
             if not benchmark_df.empty:
                 benchmark_prices = benchmark_df['Close']
                 if isinstance(benchmark_prices, pd.DataFrame):

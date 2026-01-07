@@ -8,6 +8,10 @@ __pycache__/
 dist/
 build/
 
+# 美股數據獲取模組（不commit）
+us_data_fetcher.py
+cache/us_data/
+
 # 環境變數文件（重要！保護 API keys）
 .env
 .env.local
