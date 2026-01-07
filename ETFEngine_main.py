@@ -317,8 +317,9 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             if isinstance(prices_full, pd.DataFrame):
                 prices_full = prices_full.iloc[:, 0]
             
-            # 1 年報酬率
+            # 1 年報酬率（或實際績效）
             if len(prices_full) >= 252:
+                # 數據充足：計算年化報酬率
                 period_1y_prices = prices_full.iloc[-252:]
                 start_1y = float(period_1y_prices.iloc[0])
                 end_1y = float(period_1y_prices.iloc[-1])
@@ -326,8 +327,15 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
                 ret_1y = (end_1y / start_1y) ** (1 / years_1y) - 1
                 days_1y = len(period_1y_prices)
             else:
-                ret_1y = np.nan
-                days_1y = len(prices_full)
+                # 數據不足1年：計算實際績效（主動式ETF適用）
+                if len(prices_full) > 1:
+                    start_price = float(prices_full.iloc[0])
+                    end_price = float(prices_full.iloc[-1])
+                    ret_1y = (end_price / start_price) - 1  # 實際績效，不年化
+                    days_1y = len(prices_full)
+                else:
+                    ret_1y = np.nan
+                    days_1y = len(prices_full)
             
             # 3 年報酬率
             if len(prices_full) >= 756:
@@ -468,7 +476,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '數據天數': len(df),  # 統一期間的資料天數
             '完整歷史天數': len(df_full) if not df_full.empty else 0,  # 完整歷史資料天數
             '資料期間 (年)': round(data_years, 2),
-            '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 9999,
+            '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
             '3年年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 9999,  # 3年年化報酬率
             'Alpha': round(alpha, 2) if not pd.isna(alpha) else 'N/A',
             'Beta': round(beta, 2) if not pd.isna(beta) else 'N/A',
