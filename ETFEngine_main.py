@@ -25,7 +25,7 @@ def timeout_handler(signum, frame):
     sys.exit(1)
 
 signal.signal(signal.SIGALRM, timeout_handler)
-signal.alarm(3600)  # 60 分鐘
+signal.alarm(5400)  # 90 分鐘
 
 # 設定環境變數，避免 tkinter 衝突
 os.environ['MPLBACKEND'] = 'Agg'
