@@ -23,14 +23,19 @@ def roc_to_ad(date_str):
 # 全域快取 DataFrame
 _twse_dividend_df = None
 
-def load_twse_dividend_table():
+def load_twse_dividend_table(year=2025):  # 預設爬取2025年資料
+    """載入TWSE配息表格
+    Args:
+        year: 西元年 (2025, 2024, 2023...)
+    """
     global _twse_dividend_df
     if _twse_dividend_df is None:
-        url = "https://www.twse.com.tw/zh/ETFortune/dividendList"
+        # 使用正確的URL參數格式
+        url = f"https://www.twse.com.tw/zh/ETFortune/dividendList?stkNo=&startDate={year}&endDate={year}"
         driver = webdriver.Chrome()
         driver.get(url)
-        print("等待網頁載入...")
-        time.sleep(10)  # 增加等待時間
+        print(f"等待網頁載入... (查詢{year}年配息資料)")
+        time.sleep(5)
         
         # 調試：查看網頁內容
         print("查找表格元素...")
@@ -88,16 +93,23 @@ def load_twse_dividend_table():
             
     return _twse_dividend_df
 
-def get_twse_dividend(stock_id):
-    df = load_twse_dividend_table()
+def get_twse_dividend(stock_id, year=2025):
+    """獲取指定ETF的配息資料
+    Args:
+        stock_id: 股票代號 (如 '0056')
+        year: 西元年 (2025, 2024, 2023...)
+    """
+    df = load_twse_dividend_table(year)
     if df is None:
-        print(f"❌ 無法載入股息表格")
+        print(f"❌ 無法載入{year}年股息表格")
         return pd.DataFrame()
         
     stock_id = str(stock_id)
     df_etf = df[df['證券代號'] == stock_id].copy()
     if df_etf.empty:
-        print(f"找不到 {stock_id} 配息資料")
+        print(f"找不到 {stock_id} {year}年配息資料")
+    else:
+        print(f"✅ 找到 {stock_id} {year}年配息資料: {len(df_etf)} 筆")
     return df_etf
 
 if __name__ == "__main__":
