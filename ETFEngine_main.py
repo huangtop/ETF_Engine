@@ -19,13 +19,13 @@ from config_loader import load_etf_config
 # 抑制警告
 warnings.filterwarnings('ignore')
 
-# 超時處理：30 分鐘（足以下載和分析多個 ETF）
+# 超時處理：60 分鐘（足以處理大量ETF的下載和分析）
 def timeout_handler(signum, frame):
-    print("\n❌ 程式執行超時（30 分鐘），強制退出")
+    print("\n❌ 程式執行超時（60 分鐘），強制退出")
     sys.exit(1)
 
 signal.signal(signal.SIGALRM, timeout_handler)
-signal.alarm(1800)  # 30 分鐘
+signal.alarm(3600)  # 60 分鐘
 
 # 設定環境變數，避免 tkinter 衝突
 os.environ['MPLBACKEND'] = 'Agg'
@@ -298,8 +298,15 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         # 下載優化範圍的歷史資料
         df_full = download_price_data(clean_ticker, start_date=smart_start_date, end_date=end_date, config_type=config_type)
         
-        # 下載統一期間資料（用於計算全期報酬和其他指標）
-        df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date, config_type=config_type)
+        # 🔧 優化：從完整數據中截取統一期間，避免重複下載
+        if not df_full.empty:
+            common_start_dt = pd.to_datetime(common_start_date)
+            df = df_full[df_full.index >= common_start_dt].copy()
+            print(f"  ♻️  從完整數據截取統一期間: {clean_ticker} ({len(df)} 天，避免重複下載)")
+        else:
+            # 如果完整數據失敗，才嘗試下載統一期間數據
+            print(f"  🔄 完整數據失敗，嘗試下載統一期間數據: {clean_ticker}")
+            df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date, config_type=config_type)
         
         if df.empty:
             print(f"{clean_ticker} 無資料")
