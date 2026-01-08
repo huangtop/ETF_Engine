@@ -132,7 +132,7 @@ def fetch_twse_price(ticker, start_date, end_date):
             }
             
             try:
-                response = requests.get(url, params=params, timeout=0.2, verify=False)  # 200毫秒超時 - 極速失敗
+                response = requests.get(url, params=params, timeout=10, verify=False)  # 10秒超時 - 適合遠端環境
                 data = response.json()
                 
                 if data.get('data'):
@@ -251,7 +251,7 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
             'apikey': api_key
         }
         
-        response = requests.get(url, params=params, timeout=0.2)  # 200毫秒超時 - 立刻放棄
+        response = requests.get(url, params=params, timeout=5)  # 5秒超時 - 適合API檢查
         data = response.json()
         
         # 🚀 快速檢查 - 如果API有問題立刻放棄
