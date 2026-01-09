@@ -966,7 +966,8 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         plt.close()
 
 
-def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix="", output_folder="."):
+def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix="", output_folder=".", 
+                     etf_data_dict=None, benchmark_data=None, voo_data=None):
     """繪製淨值成長折線圖（總圖+分類子圖，以基準指數正規化）
     ⚡ 優化版：全局快取基準數據，避免重複下載
     """
@@ -1018,16 +1019,17 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                   '#FF9F40', '#C9CBCF', '#7BC225', '#FF5733', '#C70039', '#8B4513']
         
         # 先繪製基準指數（較粗的線條）
-        # 下載0050作為基準，並保存數據用於相對計算
+        # 使用傳入的基準數據，避免重複下載
         benchmark_0050_data = None
         try:
             # 台股基準 - 0050固定在Y=100作為基準線
-            print("正在下載台灣50基準指數...")
-            tw_index = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date)
-            if not tw_index.empty:
-                tw_prices = tw_index['Close']
+            if benchmark_data is not None:
+                print("🔄 使用已下載的台灣50基準數據...")
+                tw_prices = benchmark_data
                 if isinstance(tw_prices, pd.DataFrame):
-                    tw_prices = tw_prices.iloc[:, 0]
+                    tw_prices = tw_prices['Close']
+                    if isinstance(tw_prices, pd.DataFrame):
+                        tw_prices = tw_prices.iloc[:, 0]
                 
                 # 0050 固定在基準線 Y=100（水平線）
                 plt.axhline(y=100, label='台灣50 (0050) 基準線', linewidth=4, color='#FF0000', 
@@ -1047,10 +1049,18 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         except Exception as e:
             print(f"VOO ETF下載失敗: {e}")
         
-        # 繪製各ETF（相對於0050的表現）
+        # 繪製各ETF（相對於0050的表現）- 使用已下載的數據
         for i, (ticker, name) in enumerate(etf_info.items()):
             try:
-                df = download_price_data(ticker.strip(), start_date=common_start_date, end_date=latest_date)
+                # 🔄 使用傳入的ETF數據，避免重複下載
+                if etf_data_dict and ticker in etf_data_dict:
+                    df = etf_data_dict[ticker]
+                    print(f"🔄 使用已下載數據: {ticker}")
+                else:
+                    # 備用：如果沒有傳入數據才下載
+                    df = download_price_data(ticker.strip(), start_date=common_start_date, end_date=latest_date)
+                    print(f"⚠️ 備用下載: {ticker}")
+                
                 if not df.empty:
                     prices = df['Close']
                     if isinstance(prices, pd.DataFrame):
