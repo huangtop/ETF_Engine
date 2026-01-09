@@ -429,7 +429,9 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '1年追蹤誤差 (%)': round(te_1y*100, 2) if not pd.isna(te_1y) else 'N/A',
             '換手率 (%)': turnover,
             '管理費 (%)': expense,
-            '股息殖利率 (%)': dividend_yield
+            '股息殖利率 (%)': dividend_yield,
+            # ⚡ 新增：原始價格數據，供圖表生成重用
+            '_price_data': df.copy()  # 存儲完整的價格DataFrame，不只是Close
         }
     except Exception as e:
         print(f"{ticker} 分析失敗: {e}")
@@ -574,8 +576,8 @@ if __name__ == '__main__':
     should_annualize = (config_type != 'active_etf')
     
     # 3. 分析所有ETF（恢復順序執行）
-    # print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
     results = []
+    etf_data_dict = {}  # ⚡ 收集ETF價格數據供圖表重用
     
     # 對於 active_etf，不進行年化；其他類型進行年化
     should_annualize = (config_type != 'active_etf')
@@ -593,6 +595,9 @@ if __name__ == '__main__':
         data = get_etf_data(ticker, common_start_date, latest_date, benchmark_returns, risk_free_rate, config, config_type, annualize=should_annualize)
         if data:
             results.append(data)
+            # ⚡ 收集價格數據供圖表重用
+            if '_price_data' in data:
+                etf_data_dict[ticker] = data['_price_data']
     
     print(f"✅ 順序分析完成：{len(results)} 支ETF")
     
@@ -735,7 +740,8 @@ if __name__ == '__main__':
             
             # 順序執行圖表生成
             # print("🎨 生成價格趨勢圖...")
-            plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix, output_folder)
+            plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix, output_folder,
+                           etf_data_dict=etf_data_dict, benchmark_data=benchmark_returns, voo_data=voo_returns)
             # print("✅ 價格趨勢圖完成")
             
             # print("🎨 生成雷達圖...")

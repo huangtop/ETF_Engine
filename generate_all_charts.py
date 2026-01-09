@@ -1162,17 +1162,34 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         print(f"\n🔍 檢查{category_name}ETF上市日期（使用已下載數據）...")
         for ticker in etf_group.keys():
             try:
-                # ⚡ 優化：使用已有價格數據推算上市日期，避免重複下載
+                # ⚡ 優化：優先使用傳入的ETF數據推算上市日期
+                if etf_data_dict and ticker in etf_data_dict:
+                    df = etf_data_dict[ticker]
+                    if not df.empty:
+                        first_date = df.index.min()
+                        etf_start_dates[ticker] = first_date
+                        print(f"  {ticker}: 上市於 {first_date.strftime('%Y-%m-%d')} (已下載數據)")
+                        
+                        if latest_etf_start is None or first_date > latest_etf_start:
+                            latest_etf_start = first_date
+                        continue
+                
+                # ⚡ 次選：使用已有價格數據推算上市日期，避免重複下載
                 cache_file = None
+                # 修正快取路徑為當前日期
+                from datetime import datetime
+                today_str = datetime.now().strftime('%Y-%m-%d')
                 potential_files = [
-                    f"price_cache/active_etf/{ticker}_2022-09-27_to_2026-01-09.csv",
-                    f"price_cache/high_dividend_etf/{ticker}_2022-09-27_to_2026-01-09.csv", 
-                    f"price_cache/industry_etf/{ticker}_2022-09-27_to_2026-01-09.csv",
+                    f"price_cache/active_etf/{ticker}_2025-07-22_to_{today_str}.csv",
+                    f"price_cache/high_dividend_etf/{ticker}_*_to_{today_str}.csv", 
+                    f"price_cache/industry_etf/{ticker}_*_to_{today_str}.csv",
                 ]
                 
-                for file_path in potential_files:
-                    if os.path.exists(file_path):
-                        cache_file = file_path
+                for file_pattern in potential_files:
+                    import glob
+                    matching_files = glob.glob(file_pattern.replace('*', '*'))
+                    if matching_files:
+                        cache_file = matching_files[0]
                         break
                 
                 if cache_file:
