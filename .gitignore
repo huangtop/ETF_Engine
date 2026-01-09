@@ -27,14 +27,13 @@ cache/
 
 # 输出文件夹
 Output_*/
-＊_output/
 Output_Active_ETF/
 Output_HighDividend_ETF/
 Output_Dividend_ETF/
 Output_US_ETF/
 Output_Industry_ETF/
 Output_Default/
-charts_output/
+# charts_output/
 
 # 测试文件（开头为test_的.py文件）
 test_*.py
@@ -76,6 +75,3 @@ TEST_SUMMARY.sh
 
 # Cache directories
 price_cache/
-
-# Output directories (generated charts and CSV files)
-Output_*/
