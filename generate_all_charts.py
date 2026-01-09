@@ -1037,15 +1037,15 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             print(f"台灣50下載失敗: {e}")
         
         try:
-            # 美股基準 - S&P 500 (使用全局快取)
-            sp500_prices = get_benchmark_data('^GSPC', common_start_date, latest_date, 'S&P 500指數')
-            if sp500_prices is not None:
-                sp500_normalized = (sp500_prices / sp500_prices.iloc[0]) * 100
-                plt.plot(sp500_normalized.index, sp500_normalized, 
-                        label='S&P 500指數', linewidth=3, color='#0000FF', 
+            # 美股基準 - VOO ETF (使用全局快取)
+            voo_prices = get_benchmark_data('VOO', common_start_date, latest_date, 'VOO S&P500 ETF')
+            if voo_prices is not None:
+                voo_normalized = (voo_prices / voo_prices.iloc[0]) * 100
+                plt.plot(voo_normalized.index, voo_normalized, 
+                        label='VOO S&P500 ETF', linewidth=3, color='#0000FF', 
                         linestyle='-.', alpha=0.8)
         except Exception as e:
-            print(f"S&P 500指數下載失敗: {e}")
+            print(f"VOO ETF下載失敗: {e}")
         
         # 繪製各ETF（相對於0050的表現）
         for i, (ticker, name) in enumerate(etf_info.items()):
@@ -1106,7 +1106,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             plt.xlabel('日期', fontsize=12)
             plt.ylabel('相對表現 (0050=100)', fontsize=12)
         except:
-            plt.title(generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: S&P500'), fontsize=16, fontweight='bold')
+            plt.title(generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: VOO'), fontsize=16, fontweight='bold')
             plt.xlabel('Date', fontsize=12)
             plt.ylabel('Relative NAV (Start=100)', fontsize=12)
             
@@ -1330,11 +1330,11 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
     # 總覽圖
     plot_overview()
     
-    # 美股相關ETF vs S&P500
+    # 美股相關ETF vs VOO ETF
     plot_category_trend(
         us_etfs, 
-        '^GSPC', 
-        'S&P500', 
+        'VOO', 
+        'VOO ETF', 
         '美股相關ETF', 
         'trend_us_etfs.png',
         '#0066CC',
@@ -1685,7 +1685,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
         
         # 美股基準（使用全局快取，跨ETF類型復用）
         if us_etfs:
-            # 優先嘗試VOO
+            # 使用VOO作為美股基準
             voo_prices = get_benchmark_data('VOO', bench_start_date, latest_date, 'VOO S&P500 ETF')
             if voo_prices is not None:
                 years_voo = len(voo_prices) / 252
@@ -1697,17 +1697,7 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
                     ret_voo = float(total_ret_voo)
                 benchmark_data['VOO'] = ('VOO S&P500', ret_voo)
             else:
-                # 備用：S&P500指數
-                sp500_prices = get_benchmark_data('^GSPC', bench_start_date, latest_date, 'S&P500 指數')
-                if sp500_prices is not None:
-                    years_sp500 = len(sp500_prices) / 252
-                    total_ret_sp500 = ((sp500_prices.iloc[-1] / sp500_prices.iloc[0]) - 1) * 100
-                    
-                    if bench_annualize and years_sp500 >= 1.0:
-                        ret_sp500 = float(((1 + total_ret_sp500/100) ** (1 / years_sp500) - 1) * 100) if years_sp500 > 0 else total_ret_sp500
-                    else:
-                        ret_sp500 = float(total_ret_sp500)
-                    benchmark_data['SP500'] = ('^GSPC S&P500', ret_sp500)
+                print("⚠️ VOO基準數據無法取得")
     except Exception as e:
         print(f"  ⚠️  基準下載失敗: {e}")
     

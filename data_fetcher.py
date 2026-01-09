@@ -286,6 +286,9 @@ def fetch_us_stock_price(symbol, start_date, end_date, api_key=None):
         response = requests.get(url, params=params, timeout=5)  # 5秒超時 - 適合API檢查
         data = response.json()
         
+        # 🔧 Alpha Vantage 免費版限制：每秒最多1次請求
+        time.sleep(2)  # 等待2秒，確保不超過API限制
+        
         # 🚀 快速檢查 - 如果API有問題立刻放棄
         if not isinstance(data, dict):
             print(f"  ❌ {symbol} API 回應格式錯誤，立刻放棄")

@@ -600,7 +600,7 @@ if __name__ == '__main__':
     # 2. 下載0050作為基準（用於計算追蹤誤差）
     print(f"\n下載基準指數 0050...")
     benchmark_returns = None
-    sp500_returns = None
+    voo_returns = None
     try:
         # 台股基準
         benchmark_df = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date, config_type=config_type)
@@ -614,26 +614,26 @@ if __name__ == '__main__':
             print(f"⚠️  0050 無資料，Alpha/Beta 將無法計算")
             benchmark_returns = None
         
-        # 美股基準 - S&P 500（用於視覺化比較）
+        # 美股基準 - VOO S&P 500 ETF（用於視覺化比較）
         print("  ⚡ 快速檢查美股數據可用性...")
         try:
-            sp500_df = download_price_data('^GSPC', start_date=common_start_date, end_date=latest_date, config_type=config_type)
+            voo_df = download_price_data('VOO', start_date=common_start_date, end_date=latest_date, config_type=config_type)
         except Exception as e:
             print(f"  ⚠️  跳過美股數據（API 不可用）: {e}")
-            sp500_df = pd.DataFrame()
-        if not sp500_df.empty:
-            sp500_prices = sp500_df['Close']
-            if isinstance(sp500_prices, pd.DataFrame):
-                sp500_prices = sp500_prices.iloc[:, 0]
-            sp500_returns = sp500_prices.pct_change().dropna()
-            print(f"✅ 美股基準資料期間: {len(sp500_returns)} 個交易日")
+            voo_df = pd.DataFrame()
+        if not voo_df.empty:
+            voo_prices = voo_df['Close']
+            if isinstance(voo_prices, pd.DataFrame):
+                voo_prices = voo_prices.iloc[:, 0]
+            voo_returns = voo_prices.pct_change().dropna()
+            print(f"✅ 美股基準資料期間: {len(voo_returns)} 個交易日")
         else:
-            print(f"⚠️  S&P500 無資料")
-            sp500_returns = None
+            print(f"⚠️  VOO 無資料")
+            voo_returns = None
     except Exception as e:
         print(f"⚠️  基準指數下載異常: {e}，Alpha/Beta 將無法計算")
         benchmark_returns = None
-        sp500_returns = None
+        voo_returns = None
     
     # 3. 分析所有ETF
     # print(f"\n開始分析各ETF（統一期間: {common_start_date} 至 {latest_date}）...")
