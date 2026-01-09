@@ -1145,14 +1145,39 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             print(f"⚠️  {category_name}無ETF資料，跳過")
             return
         
-        # 找出該組ETF的最晚上市日期
+        # 找出該組ETF的最晚上市日期 - 使用已下載的數據避免重複請求
         latest_etf_start = None
         etf_start_dates = {}
         
-        print(f"\n🔍 檢查{category_name}ETF上市日期...")
+        print(f"\n🔍 檢查{category_name}ETF上市日期（使用已下載數據）...")
         for ticker in etf_group.keys():
             try:
-                # 從很早的日期開始搜尋，找出實際上市日
+                # ⚡ 優化：使用已有價格數據推算上市日期，避免重複下載
+                cache_file = None
+                potential_files = [
+                    f"price_cache/active_etf/{ticker}_2022-09-27_to_2026-01-09.csv",
+                    f"price_cache/high_dividend_etf/{ticker}_2022-09-27_to_2026-01-09.csv", 
+                    f"price_cache/industry_etf/{ticker}_2022-09-27_to_2026-01-09.csv",
+                ]
+                
+                for file_path in potential_files:
+                    if os.path.exists(file_path):
+                        cache_file = file_path
+                        break
+                
+                if cache_file:
+                    # 從快取讀取，避免網路請求
+                    df = pd.read_csv(cache_file, index_col='Date', parse_dates=True)
+                    if not df.empty:
+                        first_date = df.index.min()
+                        etf_start_dates[ticker] = first_date
+                        print(f"  {ticker}: 上市於 {first_date.strftime('%Y-%m-%d')} (快取)")
+                        
+                        if latest_etf_start is None or first_date > latest_etf_start:
+                            latest_etf_start = first_date
+                    continue
+                
+                # 如果快取不存在，才進行網路下載（最後手段）
                 search_start = '2020-01-01'
                 df = download_price_data(ticker, start_date=search_start, end_date=latest_date)
                 if not df.empty:
@@ -1198,12 +1223,33 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         except Exception as e:
             print(f"{benchmark_name}基準下載失敗: {e}")
         
-        # 繪製該組ETF，使用絕對正規化（各自從100開始）
+        # 繪製該組ETF，使用絕對正規化（各自從100開始）- 避免重複下載
         colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C70039', '#7BC225']
         
         for i, (ticker, name) in enumerate(etf_group.items()):
             try:
-                df = download_price_data(ticker, start_date=comparison_start_date, end_date=latest_date)
+                # ⚡ 優化：優先使用快取，避免重複網路請求
+                df = None
+                cache_file = None
+                potential_files = [
+                    f"price_cache/active_etf/{ticker}_{comparison_start_date}_to_{latest_date}.csv",
+                    f"price_cache/high_dividend_etf/{ticker}_{comparison_start_date}_to_{latest_date}.csv", 
+                    f"price_cache/industry_etf/{ticker}_{comparison_start_date}_to_{latest_date}.csv",
+                ]
+                
+                for file_path in potential_files:
+                    if os.path.exists(file_path):
+                        try:
+                            df = pd.read_csv(file_path, index_col='Date', parse_dates=True)
+                            print(f"  📦 使用快取: {ticker} (避免重複下載)")
+                            break
+                        except:
+                            continue
+                
+                # 如果快取不存在或失敗，才進行網路下載
+                if df is None or df.empty:
+                    df = download_price_data(ticker, start_date=comparison_start_date, end_date=latest_date)
+                
                 if not df.empty:
                     etf_prices = df['Close']
                     if isinstance(etf_prices, pd.DataFrame):
