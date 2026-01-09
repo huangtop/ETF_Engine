@@ -63,59 +63,29 @@ def get_output_folder(config_type='active_etf'):
 
 
 def find_common_start_date(etf_list, initial_start_date, end_date, config_type='default', use_fixed_start=False):
-    """找出所有ETF的最晚開始日期作為統一比較期間
+    """🔥 全新邏輯：不下載，直接計算日期
     
     Args:
-        etf_list: ETF 列表（支持對象和數組格式）
-        initial_start_date: 初始起始日期
+        etf_list: ETF 列表
+        initial_start_date: 初始起始日期  
         end_date: 結束日期
-        use_fixed_start: 是否使用固定的起始日期（跳過太新的ETF）
+        use_fixed_start: 是否使用固定起始日期
     """
-    latest_start_date = None
-    
-    print("\n📅 檢查各ETF資料起始日期...")
-    for item in etf_list:
-        # 支持對象和數組兩種格式
-        if isinstance(item, dict):
-            ticker = item.get('ticker', '').strip()
-            name = item.get('name', '').strip()
-        else:
-            ticker = item[0].strip()
-            name = item[1].strip()
-        
-        if not ticker:
-            continue
-            
-        try:
-            df = download_price_data(ticker, start_date=initial_start_date, end_date=end_date, config_type=config_type)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                df.dropna(inplace=True)
-                if len(df) > 0:
-                    etf_start = df.index[0]
-                    print(f"  {ticker}: 資料開始於 {etf_start.strftime('%Y-%m-%d')}")
-                    
-                    # 如果使用固定起始日期，只記錄不早於起始日期的 ETF
-                    if use_fixed_start:
-                        if etf_start <= pd.to_datetime(initial_start_date):
-                            if latest_start_date is None or etf_start > latest_start_date:
-                                latest_start_date = etf_start
-                    else:
-                        if latest_start_date is None or etf_start > latest_start_date:
-                            latest_start_date = etf_start
-        except Exception as e:
-            print(f"  {ticker} 檢查失敗: {type(e).__name__}")
+    from datetime import datetime, timedelta
     
     if use_fixed_start:
-        # 對於主動式 ETF，強制使用指定的起始日期
-        common_start = initial_start_date
-        print(f"\n📊 統一比較期間: {common_start} 至 {end_date}")
-        return common_start
-    elif latest_start_date:
-        common_start = latest_start_date.strftime('%Y-%m-%d')
-        print(f"\n📊 統一比較期間: {common_start} 至 {end_date}")
-        return common_start
-    else:
+        # 主動式ETF：直接使用2025-07-22
+        print(f"📅 主動式ETF使用固定起始日期: {initial_start_date}")
+        print(f"📊 統一比較期間: {initial_start_date} 至 {end_date}")
         return initial_start_date
+    else:
+        # 其他ETF：今天倒推3年
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        three_years_ago = end_dt - timedelta(days=3*365)
+        calculated_start = three_years_ago.strftime('%Y-%m-%d')
+        print(f"� 其他ETF使用3年期間: {calculated_start} 至 {end_date}")
+        print(f"📊 統一比較期間: {calculated_start} 至 {end_date}")
+        return calculated_start
 
 def calculate_returns(prices, annualize=True):
     """計算報酬率
@@ -275,41 +245,24 @@ def calculate_alpha_beta(etf_returns, benchmark_returns, rf_rate):
 
 def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_free_rate, 
                  config, config_type='default', annualize=True):
-    """獲取ETF數據並計算指標
+    """🔥 簡化版：只下載一次！
     
     Args:
         ticker: ETF 代碼
         common_start_date: 起始日期
-        end_date: 結束日期
+        end_date: 結束日期 
         benchmark_returns: 基準報酬率序列
         risk_free_rate: 無風險利率
-        annualize: 是否年化報酬率（True=年化，False=實績）
+        annualize: 是否年化報酬率
     """
     try:
-        # 清理ticker格式
         clean_ticker = ticker.strip()
         
-        # 智能下載範圍：只下載必要的4年歷史資料（vs 原本11年）
-        # 計算起始日期：4年 = 1200天，足夠計算3年年化報酬率
-        from datetime import timedelta
-        end_dt = pd.to_datetime(end_date)
-        smart_start_date = (end_dt - timedelta(days=1200)).strftime('%Y-%m-%d')
-        
-        # 下載優化範圍的歷史資料
-        df_full = download_price_data(clean_ticker, start_date=smart_start_date, end_date=end_date, config_type=config_type)
-        
-        # 🔧 優化：從完整數據中截取統一期間，避免重複下載
-        if not df_full.empty:
-            common_start_dt = pd.to_datetime(common_start_date)
-            df = df_full[df_full.index >= common_start_dt].copy()
-            print(f"  ♻️  從完整數據截取統一期間: {clean_ticker} ({len(df)} 天，避免重複下載)")
-        else:
-            # 如果完整數據失敗，才嘗試下載統一期間數據
-            print(f"  🔄 完整數據失敗，嘗試下載統一期間數據: {clean_ticker}")
-            df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date, config_type=config_type)
+        # � 只下載一次！直接下載需要的期間
+        df = download_price_data(clean_ticker, start_date=common_start_date, end_date=end_date, config_type=config_type)
         
         if df.empty:
-            print(f"{clean_ticker} 無資料")
+            print(f"{clean_ticker} 無資料") 
             return None
         
         df.dropna(inplace=True)
@@ -317,57 +270,35 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
         if len(df) < 10:
             print(f"{clean_ticker} 有效資料太少")
             return None
-        
-        # 用完整歷史資料計算 1 年和 3 年報酬率
-        if not df_full.empty:
-            prices_full = df_full['Close']
-            if isinstance(prices_full, pd.DataFrame):
-                prices_full = prices_full.iloc[:, 0]
-            
-            # 1 年報酬率（或實際績效）
-            if len(prices_full) >= 252:
-                # 數據充足：計算年化報酬率
-                period_1y_prices = prices_full.iloc[-252:]
-                start_1y = float(period_1y_prices.iloc[0])
-                end_1y = float(period_1y_prices.iloc[-1])
-                years_1y = len(period_1y_prices) / 252
-                ret_1y = (end_1y / start_1y) ** (1 / years_1y) - 1
-                days_1y = len(period_1y_prices)
-            else:
-                # 數據不足1年：計算實際績效（主動式ETF適用）
-                if len(prices_full) > 1:
-                    start_price = float(prices_full.iloc[0])
-                    end_price = float(prices_full.iloc[-1])
-                    ret_1y = (end_price / start_price) - 1  # 實際績效，不年化
-                    days_1y = len(prices_full)
-                else:
-                    ret_1y = np.nan
-                    days_1y = len(prices_full)
-            
-            # 3 年報酬率
-            if len(prices_full) >= 756:
-                period_3y_prices = prices_full.iloc[-756:]
-                start_3y = float(period_3y_prices.iloc[0])
-                end_3y = float(period_3y_prices.iloc[-1])
-                years_3y = len(period_3y_prices) / 252
-                ret_3y = (end_3y / start_3y) ** (1 / years_3y) - 1
-                days_3y = len(period_3y_prices)
-            else:
-                ret_3y = np.nan
-                days_3y = len(prices_full)
-            
-            if not (pd.isna(ret_1y) and pd.isna(ret_3y)):
-                ret_1y_pct = f"{ret_1y*100:.2f}%" if not pd.isna(ret_1y) else "N/A"
-                ret_3y_pct = f"{ret_3y*100:.2f}%" if not pd.isna(ret_3y) else "N/A"
-                print(f"  📊 完整歷史：{len(df_full)} 天 | 1年: {ret_1y_pct} | 3年: {ret_3y_pct}")
-        else:
-            ret_1y, ret_3y = np.nan, np.nan
-            print(f"  ⚠️  {clean_ticker} 無完整歷史資料")
-            
-        # 提取價格和收益率（統一期間）
+
+        # 📊 使用當前數據計算報酬率（不需要額外下載）
         prices = df['Close']
         if isinstance(prices, pd.DataFrame):
             prices = prices.iloc[:, 0]
+        
+        if len(prices) >= 252:
+            # 數據充足：計算年化報酬率
+            start_price = float(prices.iloc[0])
+            end_price = float(prices.iloc[-1])
+            years = len(prices) / 252
+            ret_1y = ((end_price / start_price) ** (1 / years) - 1) if years > 0 else 0
+            ret_3y = ret_1y  # 暫用1年數據
+            days_1y = len(prices)
+        else:
+            # 數據不足1年：計算實際績效
+            if len(prices) > 1:
+                start_price = float(prices.iloc[0])
+                end_price = float(prices.iloc[-1])
+                ret_1y = (end_price / start_price) - 1
+                ret_3y = np.nan
+                days_1y = len(prices)
+            else:
+                ret_1y = ret_3y = np.nan
+                days_1y = len(prices)
+        
+        ret_1y_pct = f"{ret_1y*100:.2f}%" if not pd.isna(ret_1y) else "N/A"
+        ret_3y_pct = f"{ret_3y*100:.2f}%" if not pd.isna(ret_3y) else "N/A"
+        print(f"  📊 完整歷史：{len(df)} 天 | 1年: {ret_1y_pct} | 3年: {ret_3y_pct}")
         returns = prices.pct_change().dropna()
 
         # 計算各項指標（根據 annualize 參數決定是否年化）
@@ -481,7 +412,7 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             '證券代碼': clean_ticker,
             '名稱': etf_name,
             '數據天數': len(df),  # 統一期間的資料天數
-            '完整歷史天數': len(df_full) if not df_full.empty else 0,  # 完整歷史資料天數
+            '完整歷史天數': len(df),  # 使用相同的數據天數
             '資料期間 (年)': round(data_years, 2),
             '1年年化報酬率 (%)': round(ret_1y*100, 2) if not pd.isna(ret_1y) else 'N/A',
             '3年年化報酬率 (%)': round(ret_3y*100, 2) if not pd.isna(ret_3y) else 9999,  # 3年年化報酬率

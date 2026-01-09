@@ -121,5 +121,8 @@
     "00986A.TW": 1.15,
     "00988A.TW": 0.6,
     "00989A.TW": 0.55
-  }
+  },
+  "use_fixed_start_date": true,
+  "fixed_start_date": "2025-07-22",
+  "comment": "主動式ETF使用固定起始日期2025-07-22，避免重複下載"
 }
