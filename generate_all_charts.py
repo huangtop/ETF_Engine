@@ -1022,7 +1022,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         # 使用傳入的基準數據，避免重複下載
         benchmark_0050_data = None
         try:
-            # 台股基準 - 0050固定在Y=100作為基準線
+            # 📊 統一邏輯：0050也使用絕對正規化（起始點=100）
             if benchmark_data is not None:
                 print("🔄 使用已下載的台灣50基準數據...")
                 tw_prices = benchmark_data
@@ -1031,10 +1031,12 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     if isinstance(tw_prices, pd.DataFrame):
                         tw_prices = tw_prices.iloc[:, 0]
                 
-                # 0050 固定在基準線 Y=100（水平線）
-                plt.axhline(y=100, label='台灣50 (0050) 基準線', linewidth=4, color='#FF0000', 
-                           linestyle='-', alpha=0.9, zorder=10)
-                benchmark_0050_data = tw_prices  # 保存用於相對計算
+                # 0050使用絕對正規化：起始點 = 100
+                normalized_0050 = (tw_prices / tw_prices.iloc[0]) * 100
+                plt.plot(normalized_0050.index, normalized_0050, 
+                        label='台灣50 (0050) 基準指數', linewidth=4, color='#FF0000', 
+                        linestyle='-', alpha=0.9, zorder=10)
+                benchmark_0050_data = tw_prices  # 保存原始數據
         except Exception as e:
             print(f"台灣50下載失敗: {e}")
         
@@ -1066,55 +1068,29 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     if isinstance(prices, pd.DataFrame):
                         prices = prices.iloc[:, 0]
                     
-                    # 計算相對於0050的表現
-                    if benchmark_0050_data is not None:
-                        # 對齊日期
-                        common_dates = prices.index.intersection(benchmark_0050_data.index)
-                        if len(common_dates) > 0:
-                            etf_aligned = prices.loc[common_dates]
-                            benchmark_aligned = benchmark_0050_data.loc[common_dates]
-                            
-                            # 相對表現 = (ETF漲幅 / 0050漲幅) × 100
-                            etf_return = etf_aligned / etf_aligned.iloc[0]
-                            benchmark_return = benchmark_aligned / benchmark_aligned.iloc[0]
-                            relative_performance = (etf_return / benchmark_return) * 100
-                            
-                            color = colors[i % len(colors)]
-                            line_style = '-'
-                            alpha = 0.7
-                            
-                            # 使用簡化名稱
-                            short_name = name.strip()
-                            display_name = f"{ticker.replace('.TW', '')} {short_name}"
-                            
-                            plt.plot(relative_performance.index, relative_performance, 
-                                    label=display_name, linewidth=2, color=color, 
-                                    linestyle=line_style, alpha=alpha)
-                        else:
-                            print(f"{ticker} 與0050無共同日期")
-                    else:
-                        # 如果沒有0050基準，使用自己的起始點100
-                        normalized_prices = (prices / prices.iloc[0]) * 100
-                        
-                        color = colors[i % len(colors)]
-                        line_style = '-'
-                        alpha = 0.7
-                        
-                        short_name = name.strip()
-                        display_name = f"{ticker.replace('.TW', '')} {short_name}"
-                        
-                        plt.plot(normalized_prices.index, normalized_prices, 
-                                label=display_name, linewidth=2, color=color, 
-                                linestyle=line_style, alpha=alpha)
+                    # 📊 統一使用絕對正規化：各ETF自己的起始點 = 100
+                    normalized_prices = (prices / prices.iloc[0]) * 100
+                    
+                    color = colors[i % len(colors)]
+                    line_style = '-'
+                    alpha = 0.7
+                    
+                    # 使用簡化名稱
+                    short_name = name.strip()
+                    display_name = f"{ticker.replace('.TW', '')} {short_name}"
+                    
+                    plt.plot(normalized_prices.index, normalized_prices, 
+                            label=display_name, linewidth=2, color=color, 
+                            linestyle=line_style, alpha=alpha)
             except Exception as e:
                 print(f"{ticker} 折線圖繪製失敗: {e}")
         
-        # 設定標題和標籤
+        # 設定標題和標籤（統一為絕對正規化）
         try:
-            title = generate_chart_title_with_timestamp('ETF 相對台灣50(0050)表現總覽\n基準線：0050固定在100 | >100:跑贏 | <100:跑輸')
-            plt.title(title + " (2026-01-07 02:05生成)", fontsize=16, fontweight='bold')
+            title = generate_chart_title_with_timestamp('ETF 淨值成長總覽\n各ETF起始點=100 | 基準指數=100 (水平線)')
+            plt.title(title + " (2026-01-10 01:30生成)", fontsize=16, fontweight='bold')
             plt.xlabel('日期', fontsize=12)
-            plt.ylabel('相對表現 (0050=100)', fontsize=12)
+            plt.ylabel('淨值成長 (起始點=100)', fontsize=12)
         except:
             plt.title(generate_chart_title_with_timestamp('ETF vs Benchmark Overview (Base=100)\nRed: Taiwan Index | Blue: VOO'), fontsize=16, fontweight='bold')
             plt.xlabel('Date', fontsize=12)
