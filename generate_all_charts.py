@@ -228,9 +228,20 @@ def setup_matplotlib_backend():
     return plt
 
 def setup_chinese_font():
-    """設置中文字體"""
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
-    plt.rcParams['axes.unicode_minus'] = False
+    """設置中文字體 - 修復版本"""
+    try:
+        # 設定中文字體為優先
+        plt.rcParams['font.family'] = ['sans-serif']
+        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'Noto Sans CJK TC', 'Noto Sans CJK SC', 'WenQuanYi Zen Hei', 'DejaVu Sans']
+        plt.rcParams['axes.unicode_minus'] = False
+        
+        print("✅ 中文字體設定完成")
+        
+    except Exception as e:
+        print(f"⚠️ 中文字體設定失敗: {e}")
+        # 備用設定
+        plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']
+        plt.rcParams['axes.unicode_minus'] = False
 
 def plot_turnover_bar(df_results):
     """繪製換手率條形圖（Chart.js 格式）"""
@@ -328,8 +339,9 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
             continue
             
         # 使用1年年化報酬率
-        if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A':
-            all_returns.append(float(row.get('1年年化報酬率 (%)', 'N/A')))
+        ret_val = row.get('1年年化報酬率 (%)', 'N/A')
+        if ret_val != 'N/A' and ret_val != 9999:
+            all_returns.append(float(ret_val))
             
         # 其他指標：使用1年版本
         if row['1年夏普比率'] != 'N/A':
@@ -369,9 +381,13 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
             # 使用短名稱
             display_name = f"{ticker.replace('.TW', '')}\n{short_name}".replace('\n', ' ')
             
-            # 計算標準化數值（使用1年年化報酬率）
+            # 計算標準化數值（使用1年年化報酬率，排除9999異常值）
             values = []
-            ret_val = float(row.get('1年年化報酬率 (%)', 'N/A')) if row.get('1年年化報酬率 (%)', 'N/A') != 'N/A' else return_min
+            ret_val = row.get('1年年化報酬率 (%)', 'N/A')
+            if ret_val != 'N/A' and ret_val != 9999:
+                ret_val = float(ret_val)
+            else:
+                ret_val = return_min  # 使用最小值作為預設
             values.append(normalize_value(ret_val, return_min, return_max, reverse=False))
             
             sharpe_val = float(row['1年夏普比率']) if row['1年夏普比率'] != 'N/A' else sharpe_min
@@ -1032,7 +1048,7 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
             print(f"S&P 500指數下載失敗: {e}")
         
         # 繪製各ETF（相對於0050的表現）
-        for i, (ticker, name) in enumerate(etf_list.items()):
+        for i, (ticker, name) in enumerate(etf_info.items()):
             try:
                 df = download_price_data(ticker.strip(), start_date=common_start_date, end_date=latest_date)
                 if not df.empty:
@@ -1239,8 +1255,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
                     
                     color = colors[i % len(colors)]
                     
-                    # 使用短名稱
-                    short_name = row.get('短名稱', name).strip()
+                    # 使用簡化的名稱
+                    short_name = name.strip()
                     display_name = f"{ticker.replace('.TW', '')} {short_name}"
                     
                     # 主動型ETF用實線，被動型用虛線

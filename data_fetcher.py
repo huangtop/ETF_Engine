@@ -14,6 +14,10 @@ import os
 import json
 from datetime import datetime, timedelta
 import time
+import urllib3
+
+# 抑制 SSL 警告 (用於 TWSE API)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Alpha Vantage API key（從環境變數讀取，不寫到程式中）
 ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY', 'demo')
@@ -132,8 +136,24 @@ def fetch_twse_price(ticker, start_date, end_date):
             }
             
             try:
-                response = requests.get(url, params=params, timeout=10, verify=False)  # 10秒超時 - 適合遠端環境
-                data = response.json()
+                # 🔧 改善超時和重試機制
+                max_retries = 2
+                for retry in range(max_retries):
+                    try:
+                        response = requests.get(url, params=params, timeout=5, verify=False)  # 縮短超時到5秒
+                        data = response.json()
+                        break  # 成功就退出重試
+                    except (requests.Timeout, requests.ConnectionError) as e:
+                        if retry < max_retries - 1:
+                            print(f"  ⏰ TWSE請求超時，重試中... ({retry+1}/{max_retries})")
+                            time.sleep(1)  # 等待1秒後重試
+                            continue
+                        else:
+                            print(f"  ❌ TWSE請求失敗 (已重試{max_retries}次): {e}")
+                            return pd.DataFrame()
+                    except Exception as e:
+                        print(f"  ❌ TWSE請求異常: {e}")
+                        return pd.DataFrame()
                 
                 if data.get('data'):
                     for row in data['data']:
@@ -161,13 +181,25 @@ def fetch_twse_price(ticker, start_date, end_date):
                             continue
                 
             except requests.exceptions.RequestException as e:
-                pass  # 某些月份可能無資料或 API 無反應，繼續下一個月
+                print(f"  ⚠️ {year}-{month:02d} 網路問題: {str(e)[:50]}...")  # 限制錯誤訊息長度
+            except Exception as e:
+                print(f"  ❌ {year}-{month:02d} 處理異常: {str(e)[:50]}...")
             
-            # 移到下一個月
-            if month == 12:
-                current_date = pd.to_datetime(f"{year+1}-01-01")
-            else:
-                current_date = pd.to_datetime(f"{year}-{month+1:02d}-01")
+            # 🔧 防止無限循環：強制移到下一個月，加入安全檢查
+            try:
+                if month == 12:
+                    current_date = pd.to_datetime(f"{year+1}-01-01")
+                else:
+                    current_date = pd.to_datetime(f"{year}-{month+1:02d}-01")
+                
+                # 🚨 安全檢查：防止年份過大或死循環
+                if current_date.year > 2030:
+                    print(f"  ⚠️ 年份異常 ({current_date.year})，強制退出")
+                    break
+                    
+            except Exception as date_error:
+                print(f"  ❌ 日期處理異常，強制退出: {date_error}")
+                break
         
         if all_data:
             df = pd.DataFrame(all_data)

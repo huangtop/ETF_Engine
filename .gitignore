@@ -8,10 +8,6 @@ __pycache__/
 dist/
 build/
 
-# 美股數據獲取模組（不commit）
-us_data_fetcher.py
-cache/us_data/
-
 # 環境變數文件（重要！保護 API keys）
 .env
 .env.local
@@ -31,13 +27,14 @@ cache/
 
 # 输出文件夹
 Output_*/
+＊_output/
 Output_Active_ETF/
 Output_HighDividend_ETF/
 Output_Dividend_ETF/
 Output_US_ETF/
 Output_Industry_ETF/
 Output_Default/
-# charts_output/  # 移除此行，让工作流可以提交生成的图表
+charts_output/
 
 # 测试文件（开头为test_的.py文件）
 test_*.py

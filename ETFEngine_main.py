@@ -804,7 +804,7 @@ if __name__ == '__main__':
             
             # 順序執行圖表生成
             # print("🎨 生成價格趨勢圖...")
-            plot_price_trend(etf_dict, config, common_start_date, latest_date, etf_type_prefix, output_folder)
+            plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_prefix, output_folder)
             # print("✅ 價格趨勢圖完成")
             
             # print("🎨 生成雷達圖...")
