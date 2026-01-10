@@ -644,7 +644,7 @@ def plot_radar_chart(df_results, config=None, etf_type_prefix="", output_folder=
     plt.gca().add_artist(legend1)
     
     # 添加各指標冠軍信息
-    print(f"\n🏆 各指標冠軍:")
+    print(f"\n🏆 一年各指標冠軍:")
     champion_info = []
     
     # 計算冠軍（雷達圖使用1年指標，所以冠軍也用1年）

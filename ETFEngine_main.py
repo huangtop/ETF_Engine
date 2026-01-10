@@ -633,7 +633,7 @@ if __name__ == '__main__':
         print(f"{'='*180}")
 
         # 修正後的表格標題 - 單行不換行
-        print(f"{'證券代碼':<12} {'名稱':<20} {'期間(年)':<8} {'1年年化(%)':<12} {'3年年化(%)':<12} {'夏普比率':<9} {'波動率(%)':<9} {'最大回撤(%)':<11} {'追蹤誤差(%)':<11}")
+        print(f"{'證券代碼':<12} {'名稱':<20} {'期間(年)':<8} {'1年年化(%)':<12} {'3年年化(%)':<12} {'1年夏普':<9} {'1年波動(%)':<9} {'1年回撤(%)':<11} {'1年追蹤(%)':<11}")
         print('-' * 180)
 
         for _, row in df_results.iterrows():
@@ -654,10 +654,10 @@ if __name__ == '__main__':
             period = format_value(row['資料期間 (年)'], 2)
             ret_1y = format_value(row.get('1年年化報酬率 (%)', 'N/A'), 2)
             annual_return = format_value(row.get('3年年化報酬率 (%)', row.get('績效 (%)', 'N/A')), 2)
-            sharpe = format_value(row['夏普比率'], 2)
-            volatility = format_value(row['年化波動率 (%)'], 2)
-            max_dd = format_value(row['最大回撤 (%)'], 2)
-            tracking_error = format_value(row['追蹤誤差 (%)'], 2)
+            sharpe = format_value(row['1年夏普比率'], 2)
+            volatility = format_value(row['1年年化波動率 (%)'], 2)
+            max_dd = format_value(row['1年最大回撤 (%)'], 2)
+            tracking_error = format_value(row['1年追蹤誤差 (%)'], 2)
             
             print(f"{ticker:<12} {name:<20} {period:<8} {ret_1y:<12} {annual_return:<12} {sharpe:<9} {volatility:<9} {max_dd:<11} {tracking_error:<11}")
 
