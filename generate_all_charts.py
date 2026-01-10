@@ -924,10 +924,6 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
     try:
         fig, ax = plt.subplots(figsize=(14, 8))
         
-        names = [f"{e['ticker']}\n{e['name']}" for e in etfs]
-        x = np.arange(len(names))
-        width = 0.35
-        
         # 準備數據，區分普通 ETF 和 benchmark，並確保 benchmark 在最後
         regular_etfs = [e for e in etfs if e['ticker'] != '0050.TW']
         benchmark_etf = next((e for e in etfs if e['ticker'] == '0050.TW'), None)
@@ -937,8 +933,12 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         if benchmark_etf:
             ordered_etfs.append(benchmark_etf)
         
-        # 繪製所有 ETF 的柱狀圖
+        # 更新 names 和 x 軸來匹配新的順序
+        names = [f"{e['ticker']}\n{e['name']}" for e in ordered_etfs]
         x = np.arange(len(ordered_etfs))
+        width = 0.35
+        
+        # 繪製所有 ETF 的柱狀圖
         bars1 = ax.bar(x - width/2, [e['ret_1y'] for e in ordered_etfs], width, 
                        label='1-Year', color='#3498db', alpha=0.85, edgecolor='black', linewidth=1)
         bars2 = ax.bar(x + width/2, [e['ret_3y'] for e in ordered_etfs], width, 

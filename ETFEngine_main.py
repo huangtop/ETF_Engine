@@ -602,20 +602,20 @@ if __name__ == '__main__':
     
     print(f"✅ 順序分析完成：{len(results)} 支ETF")
     
-    # 為主動式 ETF 添加 0050 benchmark 數據
-    if config_type == 'active_etf':
-        try:
-            print("  📊 計算 0050 benchmark 數據...")
-            # 使用相同的期間計算 0050 的報酬率
-            benchmark_data = get_etf_data('0050.TW', common_start_date, latest_date, benchmark_returns, risk_free_rate, config, config_type, annualize=False)
-            if benchmark_data:
-                # 修改名稱和代碼以區分
-                benchmark_data['證券代碼'] = '0050.TW'
-                benchmark_data['名稱'] = '台灣50 (Benchmark)'
-                results.append(benchmark_data)
-                print(f"  ✅ 添加 0050 benchmark: {benchmark_data.get('績效 (%)', 'N/A')}")
-        except Exception as e:
-            print(f"  ⚠️ 無法添加 0050 benchmark: {e}")
+    # 為主動式 ETF 和行業 ETF 添加 0050 benchmark 數據
+    # if config_type in ['active_etf', 'industry_etf']:
+    try:
+        print("  📊 計算 0050 benchmark 數據...")
+        # 使用相同的期間和年化設置計算 0050 的報酬率
+        benchmark_data = get_etf_data('0050.TW', common_start_date, latest_date, benchmark_returns, risk_free_rate, config, config_type, annualize=should_annualize)
+        if benchmark_data:
+            # 修改名稱和代碼以區分
+            benchmark_data['證券代碼'] = '0050.TW'
+            benchmark_data['名稱'] = '台灣50 (Benchmark)'
+            results.append(benchmark_data)
+            print(f"  ✅ 添加 0050 benchmark: {benchmark_data.get('績效 (%)', 'N/A')}")
+    except Exception as e:
+        print(f"  ⚠️ 無法添加 0050 benchmark: {e}")
     
     # 4. 顯示結果
     if results:
