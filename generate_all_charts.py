@@ -956,7 +956,7 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         plt.tight_layout()
         
         os.makedirs(output_folder, exist_ok=True)
-        output_path = os.path.join(output_folder, f'{etf_type_prefix.lower()}_performance_comparison{suffix}.png')
+        output_path = os.path.join(output_folder, f'{etf_type_prefix.lower()}performance_comparison{suffix}.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"  ✅ {output_path}")
         
