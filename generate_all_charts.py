@@ -1021,6 +1021,8 @@ def plot_price_trend(etf_list, config, common_start_date, latest_date, etf_type_
         # 先繪製基準指數（較粗的線條）
         # 使用傳入的基準數據，避免重複下載
         benchmark_0050_data = None
+        # 使用統一的基準數據下載機制
+        benchmark_data = get_benchmark_data('0050.TW', common_start_date, latest_date, '0050')
         try:
             # 📊 統一邏輯：0050也使用絕對正規化（起始點=100）
             if benchmark_data is not None:
