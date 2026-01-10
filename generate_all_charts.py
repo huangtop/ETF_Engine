@@ -928,10 +928,36 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         x = np.arange(len(names))
         width = 0.35
         
-        bars1 = ax.bar(x - width/2, [e['ret_1y'] for e in etfs], width, 
+        # 準備數據，區分普通 ETF 和 benchmark，並確保 benchmark 在最後
+        regular_etfs = [e for e in etfs if e['ticker'] != '0050.TW']
+        benchmark_etf = next((e for e in etfs if e['ticker'] == '0050.TW'), None)
+        
+        # 重新排列順序：普通 ETF + benchmark（永遠在最後）
+        ordered_etfs = regular_etfs[:]
+        if benchmark_etf:
+            ordered_etfs.append(benchmark_etf)
+        
+        # 繪製所有 ETF 的柱狀圖
+        x = np.arange(len(ordered_etfs))
+        bars1 = ax.bar(x - width/2, [e['ret_1y'] for e in ordered_etfs], width, 
                        label='1-Year', color='#3498db', alpha=0.85, edgecolor='black', linewidth=1)
-        bars2 = ax.bar(x + width/2, [e['ret_3y'] for e in etfs], width, 
+        bars2 = ax.bar(x + width/2, [e['ret_3y'] for e in ordered_etfs], width, 
                        label='3-Year', color='#f1c40f', alpha=0.85, edgecolor='black', linewidth=1)
+        
+        # 為 0050 benchmark 覆蓋特殊的灰色柱狀圖（如果存在）
+        if benchmark_etf:
+            benchmark_idx = len(regular_etfs)  # benchmark 在 ordered_etfs 中的索引
+            ax.bar(x[benchmark_idx] - width/2, benchmark_etf['ret_1y'], width, 
+                   color='#95a5a6', alpha=0.9, edgecolor='black', linewidth=2, hatch='//')
+            ax.bar(x[benchmark_idx] + width/2, benchmark_etf['ret_3y'], width, 
+                   color='#95a5a6', alpha=0.9, edgecolor='black', linewidth=2, hatch='//')
+            # 添加 benchmark 到圖例
+            ax.bar([], [], color='#95a5a6', alpha=0.9, edgecolor='black', linewidth=2, hatch='//', label='台灣50 Benchmark')
+        
+        # 設置 x 軸標籤
+        names = [f"{e['ticker']}\n{e['name']}" for e in ordered_etfs]
+        ax.set_xticks(x)
+        ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
         
         for bars in [bars1, bars2]:
             for bar in bars:
@@ -952,11 +978,11 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         ax.set_xticklabels(names, fontsize=FONT_SIZE_CONFIG['tick_small'], rotation=45, ha='right')
         ax.axhline(y=0, color='black', linestyle='-', linewidth=1.5, alpha=0.7)
         ax.grid(True, alpha=0.3, axis='y')
-        ax.legend(fontsize=FONT_SIZE_CONFIG['label_medium'], loc='upper right')
+        ax.legend(fontsize=FONT_SIZE_CONFIG['label_medium'], loc='upper center')
         plt.tight_layout()
         
         os.makedirs(output_folder, exist_ok=True)
-        output_path = os.path.join(output_folder, f'{etf_type_prefix.lower()}performance_comparison{suffix}.png')
+        output_path = os.path.join(output_folder, f'{etf_type_prefix}performance_comparison{suffix}.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"  ✅ {output_path}")
         
@@ -1709,8 +1735,12 @@ def plot_performance_comparison(df_results, ret_1y_dict=None, ret_3y_dict=None, 
     
     try:
         # 台股基準
-        benchmark_0050 = download_price_data('0050.TW', start_date=bench_start_date, end_date=latest_date)
-        benchmark_006208 = download_price_data('006208.TW', start_date=bench_start_date, end_date=latest_date)
+        if config_type == 'active_etf':
+            benchmark_0050 = download_price_data('0050.TW', start_date=common_start_date, end_date=latest_date)
+            benchmark_006208 = download_price_data('006208.TW', start_date=common_start_date, end_date=latest_date)
+        else:
+            benchmark_0050 = download_price_data('0050.TW', start_date=bench_start_date, end_date=latest_date)
+            benchmark_006208 = download_price_data('006208.TW', start_date=bench_start_date, end_date=latest_date)
         
         if isinstance(benchmark_0050, pd.DataFrame) and not benchmark_0050.empty:
             years_0050 = len(benchmark_0050['Close']) / 252
