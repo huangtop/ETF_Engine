@@ -282,7 +282,8 @@ def get_etf_data(ticker, common_start_date, end_date, benchmark_returns, risk_fr
             end_price = float(prices.iloc[-1])
             years = len(prices) / 252
             ret_1y = ((end_price / start_price) ** (1 / years) - 1) if years > 0 else 0
-            ret_3y = ret_1y  # 暫用1年數據
+            # 用 end_price 計算三年年化報酬率（不管數據長度）
+            ret_3y = ((end_price / start_price) ** (1 / 3) - 1) if years > 0 else 0
             days_1y = len(prices)
         else:
             # 數據不足1年：計算實際績效
