@@ -918,8 +918,10 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
     import numpy as np
     
     plt.switch_backend('Agg')
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei', 'DejaVu Sans']
+    # 強制設置中文字體，確保在不同環境下都能正常顯示
+    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'sans-serif']
     plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['font.family'] = 'sans-serif'
     
     try:
         fig, ax = plt.subplots(figsize=(14, 8))
@@ -969,8 +971,8 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
         ax.set_xlabel('ETF名稱', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         ax.set_ylabel('報酬率（績效） (%)', fontsize=FONT_SIZE_CONFIG['label_large'], fontweight='bold')
         
-        # 生成中文標題與時間戳
-        chinese_title = f'{title} 年化報酬率（或績效）\n（藍色：1年 | 黃色：3年）'
+        # 生成中文標題與時間戳（使用半角括號以提高兼容性）
+        chinese_title = f'{title} 年化報酬率(或績效)\n(藍色:1年 | 黃色:3年)'
         title_with_timestamp = generate_chart_title_with_timestamp(chinese_title)
         ax.set_title(title_with_timestamp,
                     fontsize=FONT_SIZE_CONFIG['title_large'], fontweight='bold', pad=20)
