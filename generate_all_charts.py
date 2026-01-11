@@ -918,10 +918,7 @@ def _plot_2column_chart(etfs, etf_type_prefix, suffix, output_folder, title):
     import numpy as np
     
     plt.switch_backend('Agg')
-    # 強制設置中文字體，確保在不同環境下都能正常顯示
-    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'Microsoft YaHei', 'SimHei', 'DejaVu Sans', 'sans-serif']
-    plt.rcParams['axes.unicode_minus'] = False
-    plt.rcParams['font.family'] = 'sans-serif'
+    setup_chinese_font()
     
     try:
         fig, ax = plt.subplots(figsize=(14, 8))
